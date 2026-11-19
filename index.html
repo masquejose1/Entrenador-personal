@@ -364,7 +364,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -378,472 +378,437 @@
     };
 
     const ALLOWED_EMAIL = "josecoutomendez@gmail.com";
-    const STORAGE_KEY = "entrenador_c21_state_v4";
-    const START_DATE = new Date("2026-11-16T00:00:00");
-    const TOTAL_WEEKS = 15;
+    const STORAGE_KEY = "entrenador_c21_state_v3";
 
-    let app, auth, db, firebaseUser = null;
+    let app = null;
+    let auth = null;
+    let db = null;
     try {
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
       db = getFirestore(app);
-    } catch (e) {
-      console.warn("Firebase en modo respaldo local:", e);
+    } catch {
+      // Respaldo local si el entorno bloquea Firebase
     }
 
-    // Iconos SVG
-    const ICON_SHOE = `<svg class="h-5 w-5 text-[#fc4c02]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16h18v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2z"/><path d="M4 16l2.5-7.5a2 2 0 0 1 2.7-1.2l3.8 1.7a4 4 0 0 0 3.2 0l2.3-1a1.5 1.5 0 0 1 2.1 1.4V16"/><path d="M9 11l1.5 1.5"/><path d="M12 10l1.5 1.5"/></svg>`;
-    const ICON_DUMBBELL = `<svg class="h-5 w-5 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5h11"/><path d="M6.5 17.5h11"/><rect x="3" y="5" width="3.5" height="14" rx="1"/><rect x="17.5" y="5" width="3.5" height="14" rx="1"/><line x1="6.5" y1="12" x2="17.5" y2="12"/></svg>`;
-    const ICON_REST = `<svg class="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12h6"/></svg>`;
-    const ICON_PHOTOS = `<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+    const DEFAULT_GYM_EXERCISES = [
+      { name: "Sentadilla copa / Goblet Squat", sets: "3", reps: "10", weight: "20", done: false },
+      { name: "Peso muerto rumano mancuernas", sets: "3", reps: "10", weight: "22", done: false },
+      { name: "Zancada atrás controlada", sets: "3", reps: "8/pierna", weight: "16", done: false },
+      { name: "Abducción cadera banda elástica", sets: "3", reps: "15", weight: "Banda", done: false },
+      { name: "Elevación de talones (sóleo)", sets: "3", reps: "15", weight: "16", done: false },
+      { name: "Plancha frontal + lateral", sets: "3", reps: "40s", weight: "PC", done: false }
+    ];
+
+    const UPPER_GYM_EXERCISES = [
+      { name: "Remo con mancuerna / polea", sets: "3", reps: "12", weight: "20", done: false },
+      { name: "Press banca / flexiones", sets: "3", reps: "10", weight: "50", done: false },
+      { name: "Jalón al pecho", sets: "3", reps: "12", weight: "45", done: false },
+      { name: "Press militar mancuernas", sets: "3", reps: "10", weight: "14", done: false },
+      { name: "Facepull", sets: "3", reps: "15", weight: "15", done: false },
+      { name: "Dead bug / Pallof press", sets: "3", reps: "12", weight: "10", done: false }
+    ];
+
+    const CORE_GYM_EXERCISES = [
+      { name: "Plancha frontal", sets: "3", reps: "45s", weight: "PC", done: false },
+      { name: "Plancha lateral", sets: "3", reps: "30s/lado", weight: "PC", done: false },
+      { name: "Bird-dog controlado", sets: "3", reps: "10/lado", weight: "PC", done: false },
+      { name: "Puente de glúteo isométrico", sets: "3", reps: "35s", weight: "PC", done: false }
+    ];
+
+    function cloneExercises(list) {
+      return (list || []).map(ex => ({ ...ex, done: Boolean(ex.done) }));
+    }
 
     function showToast(msg) {
       const box = document.getElementById("toast-box");
+      if (!box) return;
       box.textContent = msg;
       box.classList.remove("hidden");
-      clearTimeout(box._t);
-      box._t = setTimeout(() => box.classList.add("hidden"), 3400);
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => box.classList.add("hidden"), 3200);
     }
 
-    function openModal(title, bodyHtml, onConfirm) {
+    function openModal({ title, bodyHtml, confirmText = "Guardar", onConfirm }) {
       const overlay = document.getElementById("modal-overlay");
       document.getElementById("modal-title").textContent = title;
       document.getElementById("modal-body").innerHTML = bodyHtml;
+      const confirmBtn = document.getElementById("modal-confirm");
+      confirmBtn.textContent = confirmText;
       overlay.classList.remove("hidden");
       overlay.classList.add("flex");
 
       const close = () => {
         overlay.classList.add("hidden");
         overlay.classList.remove("flex");
+        confirmBtn.onclick = null;
       };
       document.getElementById("modal-close").onclick = close;
       document.getElementById("modal-cancel").onclick = close;
-      document.getElementById("modal-confirm").onclick = async () => {
-        await onConfirm();
+      confirmBtn.onclick = async () => {
+        if (onConfirm) {
+          const ok = await onConfirm();
+          if (ok === false) return;
+        }
         close();
       };
     }
 
-    const defaultGymTemplates = {
-      pierna: [
-        { name: "Sentadilla Goblet / Barra", sets: 3, reps: 10, weight: 20, done: false },
-        { name: "Peso muerto rumano", sets: 3, reps: 10, weight: 30, done: false },
-        { name: "Zancada atrás controlada", sets: 3, reps: 8, weight: 10, done: false },
-        { name: "Abducción cadera / Monster walk", sets: 3, reps: 15, weight: 0, done: false },
-        { name: "Elevación de talones (sóleo)", sets: 3, reps: 15, weight: 15, done: false },
-        { name: "Plancha frontal y lateral", sets: 3, reps: 40, weight: 0, done: false }
-      ],
-      superior: [
-        { name: "Remo con mancuerna / polea", sets: 3, reps: 12, weight: 18, done: false },
-        { name: "Press banca mancuernas", sets: 3, reps: 10, weight: 16, done: false },
-        { name: "Jalón al pecho", sets: 3, reps: 12, weight: 40, done: false },
-        { name: "Press militar mancuernas", sets: 3, reps: 10, weight: 12, done: false },
-        { name: "Facepull en polea", sets: 3, reps: 15, weight: 15, done: false }
-      ]
-    };
-
-    const defaultState = {
-      currentWeekIdx: 0,
-      mealsWeekIdx: 0,
-      mealsByWeek: {},
-      profile: {
-        height: 183,
-        weight: 85.1,
-        cadence: 165,
-        zoneVt1: "141-148",
-        zoneZ2: "148-155",
-        zoneTempo: "158-164",
-        zoneVt2: "165-168",
-        zoneVo2: "187",
-        zones: "VT1: 141-148 | Z2: 148-155 | Tempo/MM: 158-164 | VT2: 165-168 | VO2MAX: 187",
-        runDays: ["Martes", "Jueves", "Sábado"],
-        gymDays: ["Lunes", "Miércoles", "Viernes"],
-        days: "Carrera: Martes, Jueves, Sábado | Gym: Lunes, Miércoles, Viernes",
-        notes: "Prioridad: pérdida de grasa y protección de rótula y cintilla iliotibial.",
-        geminiKey: "",
-        intervalsId: "",
-        intervalsKey: ""
-      },
-      goals: [
-        { id: "g-21k", name: "Media Maratón Sub-2h (Obj. 1:51–1:54)", pace: "5:15-5:25", date: "2027-02-28", active: true }
-      ],
-      weightLogs: [
-        { date: "2026-11-16", weight: 85.1, note: "Peso inicial preparación" }
-      ],
-      paceLogs: [],
-      gymTemplates: structuredClone(defaultGymTemplates),
-      weeks: {}
-    };
-
-    let state = loadLocalState();
-
-    function getWeekLabel(idx) {
-      const d1 = new Date(START_DATE.getTime() + idx * 7 * 86400000);
-      const d2 = new Date(d1.getTime() + 6 * 86400000);
-      const fmt = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
-      return `Sem ${idx + 1} (${fmt(d1)} - ${fmt(d2)})`;
-    }
-
-    function cloneGymTemplate(kind) {
-      const src = state?.gymTemplates?.[kind] || defaultGymTemplates[kind] || defaultGymTemplates.pierna;
-      return src.map(item => ({ ...item, done: false }));
-    }
-
-    function loadLocalState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          return {
-            ...defaultState,
-            ...parsed,
-            profile: { ...defaultState.profile, ...(parsed.profile || {}) },
-            gymTemplates: { ...defaultGymTemplates, ...(parsed.gymTemplates || {}) }
-          };
-        }
-      } catch (e) {
-        console.warn("Error leyendo almacenamiento local:", e);
-      }
-      return structuredClone(defaultState);
-    }
-
-    async function persistState() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch (e) {
-        console.warn("Error guardando en localStorage:", e);
-      }
-      if (firebaseUser && db) {
-        try {
-          await setDoc(doc(db, "users", firebaseUser.uid, "app", "state"), state, { merge: true });
-        } catch (e) {
-          console.warn("Error sincronizando con Firestore:", e);
-        }
-      }
-    }
-
-    function isRunType(type) {
-      return ["Rodaje", "Series", "Tempo", "Tirada Larga", "Competición"].includes(type);
-    }
-
-    // Plan maestro de 15 semanas (16/11/2026 - 28/02/2027)
-    const MASTER_PLAN_WEEKS = [
+    const RAW_WEEKS = [
       {
-        week: 1,
-        phase: "Adaptación (Viaje Valladolid)",
+        week: 1, phase: "Adaptación (Semana Cerrada / Excepción Viaje)", start_date: "2026-11-16", end_date: "2026-11-22",
         sessions: [
-          { day: "Lunes", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" },
-          { day: "Martes", type: "Series", title: "Series 4x4'", minutes: 33, target: "VT2 (165-168 ppm) · Cadencia ≥ 165 ppm", status: "done" },
-          { day: "Miércoles", type: "Rodaje", title: "Rodaje Suave", minutes: 32, target: "Z2 (148-155 ppm) · Cadencia ≥ 165 ppm", status: "done" },
-          { day: "Jueves", type: "Gym", title: "Gimnasio", minutes: 50, target: "Fuerza general y movilidad", status: "done", gymKind: "pierna" },
-          { day: "Viernes", type: "OFF", title: "Descanso / Viaje Valladolid", minutes: 0, target: "Sin carga", status: "off" },
-          { day: "Sábado", type: "OFF", title: "Sin tirada larga (Viaje Valladolid)", minutes: 0, target: "Excepción viaje", status: "off" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2026-11-16", type: "Rest", title: "Descanso", duration_min: 0, completed: false },
+          { day: "Martes", date: "2026-11-17", type: "Run_Intervals", title: "Series 4x4' (Completado)", duration_min: 33, completed: true },
+          { day: "Miércoles", date: "2026-11-18", type: "Run_Easy", title: "Rodaje Suave (Completado)", duration_min: 32, target_hr: "148-155", completed: true },
+          { day: "Jueves", date: "2026-11-19", type: "Gym", title: "Gimnasio (Completado)", duration_min: 50, completed: true },
+          { day: "Viernes", date: "2026-11-20", type: "Rest", title: "Descanso / Viaje Valladolid", duration_min: 0, completed: false },
+          { day: "Sábado", date: "2026-11-21", type: "Rest", title: "Sin tirada larga (Viaje Valladolid)", duration_min: 0, completed: false },
+          { day: "Domingo", date: "2026-11-22", type: "Rest", title: "Descanso", duration_min: 0, completed: false }
         ]
       },
       {
-        week: 2,
-        phase: "Fase 1: Construcción de Base y Umbral",
+        week: 2, phase: "Fase 1: Construcción de Base y Umbral", start_date: "2026-11-23", end_date: "2026-11-29",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Fuerza)", minutes: 50, target: "Fuerza protectora rodilla y cadera", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 50, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Tempo", title: "Calidad: 3x8' Tempo", minutes: 45, target: "10' Z2 (3 prog. 20'') + 3x8' a 5:20-5:25 (158-164 ppm, rec 2') + 5' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y estabilidad pélvica", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Z2 (Sagrada)", minutes: 75, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2026-11-23", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50 },
+          { day: "Martes", date: "2026-11-24", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 50, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2026-11-25", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2026-11-26", type: "Run_Tempo", title: "Calidad: 3x8' Tempo", duration_min: 45, target_hr: "158-164", structure: "10' Z2 (3x20'' prog) + 3x8' a 5:20-5:25 (rec 2') + 5' Z2" },
+          { day: "Viernes", date: "2026-11-27", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2026-11-28", type: "Run_Long", title: "Tirada Larga Z2", duration_min: 75, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2026-11-29", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 3,
-        phase: "Fase 1: Construcción de Base y Umbral",
+        week: 3, phase: "Fase 1: Construcción de Base y Umbral", start_date: "2026-11-30", end_date: "2026-12-06",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Fuerza)", minutes: 50, target: "Fuerza protectora rodilla y cadera", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 55, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Series", title: "Calidad: 6x3' VT2", minutes: 45, target: "10' Z2 + 6x3' a 5:00-5:08 (VT2 165-168 ppm, rec 90'') + 8' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y estabilidad pélvica", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Z2 (Sagrada)", minutes: 85, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2026-11-30", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50 },
+          { day: "Martes", date: "2026-12-01", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 55, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2026-12-02", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2026-12-03", type: "Run_Intervals", title: "Calidad: 6x3' VT2", duration_min: 45, target_hr: "165-168", structure: "10' Z2 + 6x3' a 5:00-5:08 (rec 90'') + 8' Z2" },
+          { day: "Viernes", date: "2026-12-04", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2026-12-05", type: "Run_Long", title: "Tirada Larga Z2", duration_min: 85, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2026-12-06", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 4,
-        phase: "Fase 1: Descarga",
+        week: 4, phase: "Fase 1: Descarga", start_date: "2026-12-07", end_date: "2026-12-13",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Ligero)", minutes: 40, target: "Carga moderada sin fatiga", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Suave VT1", minutes: 40, target: "VT1 (141-148 ppm) · Ritmo ref. 5:55-6:10 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Series", title: "Calidad: 8x1' Rápido", minutes: 35, target: "10' Z2 + 8x1' a 4:45-4:55 (rec 1') + 9' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Descarga Z2", minutes: 65, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2026-12-07", type: "Gym_Legs_Light", title: "Gimnasio: Pierna (Ligero)", duration_min: 40 },
+          { day: "Martes", date: "2026-12-08", type: "Run_Recovery", title: "Rodaje Suave VT1", duration_min: 40, target_hr: "141-148", target_pace: "5:55-6:10" },
+          { day: "Miércoles", date: "2026-12-09", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2026-12-10", type: "Run_Intervals", title: "Calidad: 8x1' Rápido", duration_min: 35, target_hr: "165-168", structure: "10' Z2 + 8x1' a 4:45-4:55 (rec 1') + 9' Z2" },
+          { day: "Viernes", date: "2026-12-11", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2026-12-12", type: "Run_Long", title: "Tirada Larga Descarga Z2", duration_min: 65, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2026-12-13", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 5,
-        phase: "Fase 2: Desarrollo Específico",
+        week: 5, phase: "Fase 2: Desarrollo Específico y Ritmo Objetivo", start_date: "2026-12-14", end_date: "2026-12-20",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Fuerza)", minutes: 50, target: "Fuerza protectora rodilla y cadera", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 55, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Series", title: "Calidad: 5x5' VT2", minutes: 50, target: "10' Z2 + 5x5' a 5:02-5:10 (VT2 165-168 ppm, rec 2') + 5' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Z2 (Sagrada)", minutes: 90, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2026-12-14", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50 },
+          { day: "Martes", date: "2026-12-15", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 55, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2026-12-16", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2026-12-17", type: "Run_Intervals", title: "Calidad: 5x5' VT2", duration_min: 50, target_hr: "165-168", structure: "10' Z2 + 5x5' a 5:02-5:10 (rec 2') + 5' Z2" },
+          { day: "Viernes", date: "2026-12-18", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2026-12-19", type: "Run_Long", title: "Tirada Larga Z2", duration_min: 90, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2026-12-20", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 6,
-        phase: "Fase 2: Desarrollo Específico",
+        week: 6, phase: "Fase 2: Desarrollo Específico y Ritmo Objetivo", start_date: "2026-12-21", end_date: "2026-12-27",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Fuerza)", minutes: 50, target: "Fuerza protectora rodilla y cadera", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 60, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Tempo", title: "Calidad: 2x15' Ritmo MM", minutes: 50, target: "10' Z2 + 2x15' a 5:18-5:25 (158-164 ppm, rec 3') + 7' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Z2 (Sagrada)", minutes: 95, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2026-12-21", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50 },
+          { day: "Martes", date: "2026-12-22", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2026-12-23", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2026-12-24", type: "Run_Tempo", title: "Calidad: 2x15' Ritmo MM", duration_min: 50, target_hr: "158-164", structure: "10' Z2 + 2x15' a 5:18-5:25 (rec 3') + 7' Z2" },
+          { day: "Viernes", date: "2026-12-25", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2026-12-26", type: "Run_Long", title: "Tirada Larga Z2", duration_min: 95, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2026-12-27", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 7,
-        phase: "Fase 2: Desarrollo Específico",
+        week: 7, phase: "Fase 2: Desarrollo Específico y Ritmo Objetivo", start_date: "2026-12-28", end_date: "2027-01-03",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Fuerza)", minutes: 50, target: "Fuerza protectora rodilla y cadera", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 60, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Tempo", title: "Calidad: 3x12' Tempo", minutes: 55, target: "10' Z2 + 3x12' a 5:15-5:22 (158-164 ppm, rec 2') + 5' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Progresiva", minutes: 100, target: "85' Z2 (148-155 ppm) + últimos 15' a 5:25 min/km", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2026-12-28", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50 },
+          { day: "Martes", date: "2026-12-29", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2026-12-30", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2026-12-31", type: "Run_Tempo", title: "Calidad: 3x12' Tempo", duration_min: 55, target_hr: "158-164", structure: "10' Z2 + 3x12' a 5:15-5:22 (rec 2') + 5' Z2" },
+          { day: "Viernes", date: "2027-01-01", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2027-01-02", type: "Run_Long_Progression", title: "Tirada Larga Progresiva", duration_min: 100, target_hr: "148-162", structure: "85' Z2 + últimos 15' a 5:25 min/km" },
+          { day: "Domingo", date: "2027-01-03", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 8,
-        phase: "Fase 2: Descarga",
+        week: 8, phase: "Fase 2: Descarga", start_date: "2027-01-04", end_date: "2027-01-10",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Ligero)", minutes: 40, target: "Carga moderada sin fatiga", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Suave VT1", minutes: 45, target: "VT1 (141-148 ppm) · Ritmo ref. 5:55-6:10 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Series", title: "Calidad: 5x2' Rápido", minutes: 40, target: "10' Z2 + 5x2' a 4:55-5:05 (VT2, rec 90'') + 12' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Descarga Z2", minutes: 70, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2027-01-04", type: "Gym_Legs_Light", title: "Gimnasio: Pierna (Ligero)", duration_min: 40 },
+          { day: "Martes", date: "2027-01-05", type: "Run_Recovery", title: "Rodaje Suave VT1", duration_min: 45, target_hr: "141-148", target_pace: "5:55-6:10" },
+          { day: "Miércoles", date: "2027-01-06", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2027-01-07", type: "Run_Intervals", title: "Calidad: 5x2' Rápido", duration_min: 40, target_hr: "165-168", structure: "10' Z2 + 5x2' a 4:55-5:05 (rec 90'') + 12' Z2" },
+          { day: "Viernes", date: "2027-01-08", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2027-01-09", type: "Run_Long", title: "Tirada Larga Descarga Z2", duration_min: 70, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2027-01-10", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 9,
-        phase: "Fase 3: Pico de Carga",
+        week: 9, phase: "Fase 3: Pico de Carga y Simulación Real", start_date: "2027-01-11", end_date: "2027-01-17",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Mantenimiento)", minutes: 45, target: "Mantenimiento neuromuscular sin agujetas", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 60, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Tempo", title: "Específico: 2x18' Ritmo MM", minutes: 55, target: "10' Z2 + 2x18' a 5:15-5:22 (158-164 ppm, rec 3') + 6' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Z2 (Sagrada)", minutes: 105, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2027-01-11", type: "Gym_Legs_Maint", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45 },
+          { day: "Martes", date: "2027-01-12", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2027-01-13", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2027-01-14", type: "Run_Tempo", title: "Específico: 2x18' Ritmo MM", duration_min: 55, target_hr: "158-164", structure: "10' Z2 + 2x18' a 5:15-5:22 (rec 3') + 6' Z2" },
+          { day: "Viernes", date: "2027-01-15", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2027-01-16", type: "Run_Long", title: "Tirada Larga Z2", duration_min: 105, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2027-01-17", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 10,
-        phase: "Fase 3: Pico de Carga",
+        week: 10, phase: "Fase 3: Pico de Carga y Simulación Real", start_date: "2027-01-18", end_date: "2027-01-24",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Mantenimiento)", minutes: 45, target: "Mantenimiento neuromuscular", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 60, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Series", title: "Específico: 4x8' VT2", minutes: 55, target: "10' Z2 + 4x8' a 5:05-5:12 (VT2 165-168 ppm, rec 2') + 7' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Progresiva", minutes: 110, target: "85' Z2 (148-155 ppm) + últimos 25' a 5:20 min/km", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2027-01-18", type: "Gym_Legs_Maint", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45 },
+          { day: "Martes", date: "2027-01-19", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2027-01-20", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2027-01-21", type: "Run_Intervals", title: "Específico: 4x8' VT2", duration_min: 55, target_hr: "165-168", structure: "10' Z2 + 4x8' a 5:05-5:12 (rec 2') + 7' Z2" },
+          { day: "Viernes", date: "2027-01-22", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2027-01-23", type: "Run_Long_Progression", title: "Tirada Larga Progresiva", duration_min: 110, target_hr: "148-163", structure: "85' Z2 + últimos 25' a 5:20 min/km" },
+          { day: "Domingo", date: "2027-01-24", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 11,
-        phase: "Fase 3: Descarga",
+        week: 11, phase: "Fase 3: Descarga", start_date: "2027-01-25", end_date: "2027-01-31",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Ligero)", minutes: 40, target: "Carga moderada sin fatiga", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Suave VT1", minutes: 45, target: "VT1 (141-148 ppm) · Ritmo ref. 5:55-6:10 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Tempo", title: "Calidad: 3x6' Tempo", minutes: 40, target: "10' Z2 + 3x6' a 5:15 (158-164 ppm, rec 2') + 8' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Descarga Z2", minutes: 75, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2027-01-25", type: "Gym_Legs_Light", title: "Gimnasio: Pierna (Ligero)", duration_min: 40 },
+          { day: "Martes", date: "2027-01-26", type: "Run_Recovery", title: "Rodaje Suave VT1", duration_min: 45, target_hr: "141-148", target_pace: "5:55-6:10" },
+          { day: "Miércoles", date: "2027-01-27", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2027-01-28", type: "Run_Tempo", title: "Calidad: 3x6' Tempo", duration_min: 40, target_hr: "158-164", structure: "10' Z2 + 3x6' a 5:15 (rec 2') + 8' Z2" },
+          { day: "Viernes", date: "2027-01-29", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2027-01-30", type: "Run_Long", title: "Tirada Larga Descarga Z2", duration_min: 75, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2027-01-31", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 12,
-        phase: "Fase 3: Pico Máximo de Carga",
+        week: 12, phase: "Fase 3: Pico Máximo de Carga", start_date: "2027-02-01", end_date: "2027-02-07",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Mantenimiento)", minutes: 45, target: "Mantenimiento neuromuscular", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 60, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Tempo", title: "Específico: 40' Continuos Ritmo MM", minutes: 55, target: "10' Z2 + 40' continuos a 5:18-5:25 (158-164 ppm) + 5' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Pico Progresiva", minutes: 120, target: "90' Z2 (148-155 ppm) + últimos 30' a 5:20 min/km", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2027-02-01", type: "Gym_Legs_Maint", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45 },
+          { day: "Martes", date: "2027-02-02", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2027-02-03", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2027-02-04", type: "Run_Tempo", title: "Específico: 40' Continuos Ritmo MM", duration_min: 55, target_hr: "158-164", structure: "10' Z2 + 40' continuos a 5:18-5:25 + 5' Z2" },
+          { day: "Viernes", date: "2027-02-05", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2027-02-06", type: "Run_Long_Progression", title: "Tirada Larga Pico Progresiva", duration_min: 120, target_hr: "148-163", structure: "90' Z2 + últimos 30' a 5:20 min/km" },
+          { day: "Domingo", date: "2027-02-07", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 13,
-        phase: "Fase 4: Tapering",
+        week: 13, phase: "Fase 4: Tapering y Competición", start_date: "2027-02-08", end_date: "2027-02-14",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Pierna (Muy suave)", minutes: 35, target: "Tono ligero sin fatiga", status: "pending", gymKind: "pierna" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Base Z2", minutes: 50, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 50, target: "Tracción/Empuje compensatorio", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Tempo", title: "Activación: 3x8' Ritmo MM", minutes: 45, target: "10' Z2 + 3x8' a 5:18 (158-164 ppm, rec 2') + 7' Z2", status: "pending" },
-          { day: "Viernes", type: "Gym", title: "Gimnasio: Opcional / Core", minutes: 40, target: "Core y movilidad", status: "pending", gymKind: "superior" },
-          { day: "Sábado", type: "Tirada Larga", title: "Tirada Larga Tapering Z2", minutes: 85, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2027-02-08", type: "Gym_Legs_VeryLight", title: "Gimnasio: Pierna (Muy suave)", duration_min: 35 },
+          { day: "Martes", date: "2027-02-09", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 50, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2027-02-10", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50 },
+          { day: "Jueves", date: "2027-02-11", type: "Run_Tempo", title: "Activación: 3x8' Ritmo MM", duration_min: 45, target_hr: "158-164", structure: "10' Z2 + 3x8' a 5:18 (rec 2') + 7' Z2" },
+          { day: "Viernes", date: "2027-02-12", type: "Gym_Optional", title: "Gimnasio: Opcional / Core", duration_min: 40 },
+          { day: "Sábado", date: "2027-02-13", type: "Run_Long", title: "Tirada Larga Tapering Z2", duration_min: 85, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2027-02-14", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 14,
-        phase: "Fase 4: Tapering",
+        week: 14, phase: "Fase 4: Tapering y Competición", start_date: "2027-02-15", end_date: "2027-02-21",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Gimnasio: Solo Core (NO PIERNA)", minutes: 35, target: "Core y estabilidad; cero carga en piernas", status: "pending", gymKind: "superior" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Suave Z2", minutes: 45, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior", minutes: 45, target: "Tren superior ligero", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Series", title: "Activación: 4x4' Chispa", minutes: 35, target: "10' Z2 + 4x4' a 5:05 (VT2, rec 2') + 5' Z2", status: "pending" },
-          { day: "Viernes", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" },
-          { day: "Sábado", type: "Tirada Larga", title: "Rodaje Largo Suave Z2", minutes: 60, target: "Z2 (148-155 ppm) · Ritmo ref. 5:35-5:50 · Cad ≥ 165", status: "pending" },
-          { day: "Domingo", type: "OFF", title: "Descanso", minutes: 0, target: "Recuperación", status: "off" }
+          { day: "Lunes", date: "2027-02-15", type: "Gym_Core", title: "Gimnasio: Solo Core (NO PIERNA)", duration_min: 35 },
+          { day: "Martes", date: "2027-02-16", type: "Run_Easy", title: "Rodaje Suave Z2", duration_min: 45, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Miércoles", date: "2027-02-17", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 45 },
+          { day: "Jueves", date: "2027-02-18", type: "Run_Intervals", title: "Activación: 4x4' Chispa", duration_min: 35, target_hr: "165-168", structure: "10' Z2 + 4x4' a 5:05 (rec 2') + 5' Z2" },
+          { day: "Viernes", date: "2027-02-19", type: "Rest", title: "Descanso", duration_min: 0 },
+          { day: "Sábado", date: "2027-02-20", type: "Run_Long", title: "Rodaje Largo Suave Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50" },
+          { day: "Domingo", date: "2027-02-21", type: "Rest", title: "Descanso", duration_min: 0 }
         ]
       },
       {
-        week: 15,
-        phase: "Semana de Competición",
+        week: 15, phase: "Semana de Competición", start_date: "2027-02-22", end_date: "2027-02-28",
         sessions: [
-          { day: "Lunes", type: "Gym", title: "Movilidad y Core Suave (NO PIERNA)", minutes: 30, target: "Movilidad articular y core suave", status: "pending", gymKind: "superior" },
-          { day: "Martes", type: "Rodaje", title: "Rodaje Activación VT1", minutes: 35, target: "VT1 (141-148 ppm) · Ritmo ref. 5:55-6:10 · Cad ≥ 165", status: "pending" },
-          { day: "Miércoles", type: "Gym", title: "Gimnasio: Tren Superior Ligero", minutes: 35, target: "Activación ligera", status: "pending", gymKind: "superior" },
-          { day: "Jueves", type: "Series", title: "Activación Pre-Carrera", minutes: 25, target: "10' VT1 + 4x1' a 5:15 (rec 1') + 7' VT1", status: "pending" },
-          { day: "Viernes", type: "OFF", title: "Descanso Total e Hidratación", minutes: 0, target: "Carga de hidratos y descanso", status: "off" },
-          { day: "Sábado", type: "OFF", title: "Descanso / Activación Caminata", minutes: 0, target: "Descanso previo", status: "off" },
-          { day: "Domingo", type: "Competición", title: "MEDIA MARATÓN (21,1 km)", minutes: 112, target: "Ritmo meta 5:15-5:25/km · Tiempo obj. 1:51:00-1:54:00 · Cad ≥ 165", status: "pending" }
+          { day: "Lunes", date: "2027-02-22", type: "Mobility", title: "Movilidad y Core Suave (NO PIERNA)", duration_min: 30 },
+          { day: "Martes", date: "2027-02-23", type: "Run_Recovery", title: "Rodaje Activación VT1", duration_min: 35, target_hr: "141-148", target_pace: "5:55-6:10" },
+          { day: "Miércoles", date: "2027-02-24", type: "Gym_Upper_Light", title: "Gimnasio: Tren Superior Ligero", duration_min: 35 },
+          { day: "Jueves", date: "2027-02-25", type: "Run_Activation", title: "Activación Pre-Carrera", duration_min: 25, target_hr: "141-162", structure: "10' VT1 + 4x1' a 5:15 (rec 1') + 7' VT1" },
+          { day: "Viernes", date: "2027-02-26", type: "Rest", title: "Descanso Total e Hidratación", duration_min: 0 },
+          { day: "Sábado", date: "2027-02-27", type: "Rest", title: "Descanso / Activación Caminata", duration_min: 0 },
+          { day: "Domingo", date: "2027-02-28", type: "Race", title: "MEDIA MARATÓN (21,1 km)", duration_min: 114, target_hr: "158-167", target_pace: "5:15-5:25" }
         ]
       }
     ];
 
-    function buildDeterministicWeek(idx, painCut50 = false, noWeekend = false) {
-      const template = MASTER_PLAN_WEEKS[idx] || MASTER_PLAN_WEEKS[1];
-      const factor = painCut50 ? 0.5 : 1;
-      const adjMin = (m) => (m > 0 ? Math.max(15, Math.round((m * factor) / 5) * 5) : 0);
-
-      let sessions = template.sessions.map((s, i) => {
-        const isRun = isRunType(s.type);
-        const mins = isRun && s.type !== "Competición" ? adjMin(s.minutes) : s.minutes;
-        return {
-          id: `w${idx}-s${i}`,
-          day: s.day,
-          type: s.type,
-          title: s.title,
-          minutes: mins,
-          target: s.target,
-          status: s.status || "pending",
-          failReason: "",
-          gymKind: s.gymKind || null,
-          gymExercises: s.type === "Gym" ? cloneGymTemplate(s.gymKind || "pierna") : [],
-          audit: null
-        };
-      });
-
-      if (noWeekend) {
-        const satRun = sessions.find(x => x.day === "Sábado" && isRunType(x.type));
-        sessions = sessions.map(s => {
-          if (s.day === "Viernes" && satRun) {
-            return {
-              ...s,
-              type: "Rodaje",
-              title: "Rodaje Aeróbico (sustituye finde)",
-              minutes: Math.min(65, satRun.minutes),
-              target: "Z2 (148-155 ppm) · Cadencia ≥ 165 ppm",
-              status: s.status === "done" ? "done" : "pending",
-              gymExercises: []
-            };
+    function buildInitialWeeks() {
+      return RAW_WEEKS.map(w => ({
+        week: w.week,
+        phase: w.phase,
+        start_date: w.start_date,
+        end_date: w.end_date,
+        painCut50: false,
+        sessions: w.sessions.map((s, idx) => {
+          const isGym = (s.type || "").startsWith("Gym") || s.type === "Mobility";
+          const isRest = s.type === "Rest" || Number(s.duration_min || 0) === 0;
+          let gymExercises = [];
+          if (isGym) {
+            if (s.type.includes("Upper")) gymExercises = cloneExercises(UPPER_GYM_EXERCISES);
+            else if (s.type.includes("Core") || s.type === "Mobility") gymExercises = cloneExercises(CORE_GYM_EXERCISES);
+            else gymExercises = cloneExercises(DEFAULT_GYM_EXERCISES);
           }
-          if ((s.day === "Sábado" || s.day === "Domingo") && s.status !== "done") {
-            return { ...s, type: "OFF", title: "Sin disponibilidad fin de semana", minutes: 0, target: "-", status: "off", gymExercises: [] };
-          }
-          return s;
-        });
-      }
-
-      return { weekIdx: idx, phase: template.phase, painCut50, sessions };
-    }
-
-    function initWeekSelect() {
-      const optionsHtml = Array.from({ length: TOTAL_WEEKS }, (_, i) =>
-        `<option value="${i}">${getWeekLabel(i)}</option>`
-      ).join("");
-      const sel = document.getElementById("week-select");
-      sel.innerHTML = optionsHtml;
-      sel.value = state.currentWeekIdx;
-
-      const mSel = document.getElementById("meals-week-select");
-      if (mSel) {
-        mSel.innerHTML = optionsHtml;
-        mSel.value = state.mealsWeekIdx ?? state.currentWeekIdx;
-      }
-    }
-
-    function getCurrentWeek() {
-      return getWeekByIndex(state.currentWeekIdx);
-    }
-
-    function getWeekByIndex(idx) {
-      const safeIdx = Math.max(0, Math.min(TOTAL_WEEKS - 1, idx));
-      const key = `w_${safeIdx}`;
-      if (!state.weeks[key]) {
-        state.weeks[key] = buildDeterministicWeek(safeIdx, false, false);
-      }
-      return state.weeks[key];
-    }
-
-    // Propagar ejercicios de gimnasio editados a semanas futuras
-    function propagateGymToFutureWeeks(fromWeekIdx, gymKind, exercises) {
-      const cleanTemplate = exercises.map(ex => ({
-        name: ex.name,
-        sets: Number(ex.sets) || 3,
-        reps: Number(ex.reps) || 10,
-        weight: Number(ex.weight) || 0,
-        done: false
+          return {
+            id: `w${w.week}-d${idx}`,
+            day: s.day,
+            date: s.date,
+            type: s.type,
+            title: s.title,
+            structure: s.structure || "",
+            target_hr: s.target_hr || "",
+            target_pace: s.target_pace || "",
+            duration_min: Number(s.duration_min || 0),
+            base_duration_min: Number(s.duration_min || 0),
+            status: s.completed ? "done" : (isRest ? "off" : "pending"),
+            failReason: "",
+            gymExercises,
+            audit: null
+          };
+        })
       }));
-      if (gymKind) state.gymTemplates[gymKind] = structuredClone(cleanTemplate);
+    }
 
-      for (let w = fromWeekIdx + 1; w < TOTAL_WEEKS; w++) {
-        const wk = getWeekByIndex(w);
-        wk.sessions.forEach(sess => {
-          if (sess.type === "Gym" && sess.status !== "done" && (!gymKind || sess.gymKind === gymKind)) {
-            sess.gymExercises = structuredClone(cleanTemplate);
+    function createDefaultState() {
+      return {
+        currentWeekIdx: 0,
+        mealsWeekIdx: 0,
+        profile: {
+          height: 183,
+          weight: 85.1,
+          cadence: 165,
+          zones: { vt1: "141-148", z2: "148-155", tempo: "158-164", vt2: "165-168", vo2: "187" },
+          runDays: ["Martes", "Jueves", "Sábado"],
+          gymDays: ["Lunes", "Miércoles", "Viernes"],
+          notes: "Prioridad pérdida de grasa y salud articular (rótula y cintilla iliotibial).",
+          geminiKey: "",
+          intervalsId: "",
+          intervalsKey: ""
+        },
+        goals: [
+          { id: "g-21k-sub2", name: "Media Maratón Sub-1h55m", pace: "5:15-5:25", targetTime: "1:51:00 - 1:54:00", date: "2027-02-28", active: true }
+        ],
+        weightLogs: [
+          { date: "2026-11-16", weight: 85.1, note: "Peso inicial preparación" }
+        ],
+        runActivities: [],
+        paceHistory: [],
+        paceBullets: [],
+        mealsByWeek: {},
+        chatHistory: [],
+        weeks: buildInitialWeeks()
+      };
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return createDefaultState();
+        const parsed = JSON.parse(raw);
+        return { ...createDefaultState(), ...parsed };
+      } catch {
+        return createDefaultState();
+      }
+    }
+
+    let state = loadState();
+
+    async function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch {}
+      if (db && auth?.currentUser?.email === ALLOWED_EMAIL) {
+        try {
+          await setDoc(doc(db, "athletes", ALLOWED_EMAIL), { updatedAt: Date.now(), payload: JSON.stringify(state) }, { merge: true });
+        } catch {}
+      }
+    }
+
+    function isRunType(type) {
+      return ["Run_Easy", "Run_Tempo", "Run_Intervals", "Run_Long", "Run_Long_Progression", "Run_Recovery", "Run_Activation", "Race"].includes(type);
+    }
+
+    function isGymType(type) {
+      return (type || "").startsWith("Gym") || type === "Mobility";
+    }
+
+    function shoeIcon() {
+      return `<svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 16v2a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2c0-1.5-1.5-2.5-3.5-3l-5.5-5-2.5 1.5-2-1.5-4.5 5.5C3.2 13.8 2 14.8 2 16z"></path><line x1="6" y1="19" x2="6" y2="16"></line><line x1="18" y1="19" x2="18" y2="16"></line></svg>`;
+    }
+
+    function dumbbellIcon() {
+      return `<svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"></path></svg>`;
+    }
+
+    function photoIcon() {
+      return `<svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
+    }
+
+    function propagateGymToFutureWeeks(fromWeekIdx, targetType, exercises) {
+      const clean = exercises.map(ex => ({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight, done: false }));
+      for (let w = fromWeekIdx + 1; w < state.weeks.length; w++) {
+        state.weeks[w].sessions.forEach(s => {
+          if (isGymType(s.type) && s.status !== "done" && (s.type === targetType || (!targetType.includes("Upper") && !isGymType(s.type) === false && s.day === "Lunes"))) {
+            s.gymExercises = cloneExercises(clean);
           }
         });
       }
     }
 
-    // =========================================================================
-    // RENDERIZADO DE LA PESTAÑA SEMANA
-    // =========================================================================
+    function applyPainCutToWeek(weekObj, enabled) {
+      weekObj.painCut50 = Boolean(enabled);
+      weekObj.sessions.forEach(s => {
+        if (s.status === "done") return;
+        const base = Number(s.base_duration_min ?? s.duration_min ?? 0);
+        s.base_duration_min = base;
+        if (isRunType(s.type) && base > 0) {
+          s.duration_min = weekObj.painCut50 ? Math.max(15, Math.round((base * 0.5) / 5) * 5) : base;
+        }
+      });
+    }
+
+    function renderHeader() {
+      const activeGoal = state.goals.find(g => g.active) || state.goals[0];
+      if (activeGoal) {
+        document.getElementById("header-goal").textContent = `${activeGoal.name} (${activeGoal.pace}/km)`;
+      }
+      const wStr = String(state.profile.weight).replace(".", ",");
+      document.getElementById("header-status").textContent = `${wStr} kg · Cadencia ≥ ${state.profile.cadence || 165} ppm · Z2 ${state.profile.zones.z2} ppm`;
+
+      const btn = document.getElementById("cloud-auth-trigger");
+      if (auth?.currentUser?.email === ALLOWED_EMAIL) {
+        btn.textContent = "Nube activa";
+        btn.className = "rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700";
+      } else {
+        btn.textContent = "Modo Local";
+        btn.className = "rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:border-slate-300";
+      }
+    }
+
+    function initSelectors() {
+      const opts = state.weeks.map((w, i) => `<option value="${i}">Sem ${w.week} · ${w.start_date.slice(5)} a ${w.end_date.slice(5)}</option>`).join("");
+      const ws = document.getElementById("week-select");
+      const ms = document.getElementById("meals-week-select");
+      ws.innerHTML = opts;
+      ms.innerHTML = opts;
+      ws.value = state.currentWeekIdx;
+      ms.value = state.mealsWeekIdx;
+    }
+
     function renderWeek() {
-      const week = getCurrentWeek();
-      const sessions = week.sessions;
-      const active = sessions.filter(s => s.status !== "off");
-      const done = active.filter(s => s.status === "done");
-      const runSessions = active.filter(s => isRunType(s.type));
-      const runMins = runSessions.reduce((acc, s) => acc + Number(s.minutes || 0), 0);
-      const doneRunMins = runSessions.filter(s => s.status === "done").reduce((acc, s) => acc + Number(s.minutes || 0), 0);
-      const pct = runMins > 0 ? Math.min(100, Math.round((doneRunMins / runMins) * 100)) : (done.length > 0 ? 100 : 0);
+      const wIdx = state.currentWeekIdx;
+      const w = state.weeks[wIdx];
+      document.getElementById("week-select").value = wIdx;
+      document.getElementById("week-phase-badge").textContent = `${w.phase}${w.painCut50 ? " · Protección articular -50%" : ""}`;
 
-      document.getElementById("week-summary").textContent = `${done.length}/${active.length} sesiones completadas`;
-      document.getElementById("week-run-progress-label").textContent = `${doneRunMins} / ${runMins} min carrera`;
-      document.getElementById("week-progress-bar").style.width = `${pct}%`;
-      document.getElementById("week-phase-badge").textContent = week.phase || "Base";
-
-      // Toggle -50%
       const painBtn = document.getElementById("toggle-pain-btn");
       const painKnob = document.getElementById("toggle-pain-knob");
-      painBtn.setAttribute("aria-checked", String(Boolean(week.painCut50)));
-      if (week.painCut50) {
+      painBtn.setAttribute("aria-checked", String(Boolean(w.painCut50)));
+      if (w.painCut50) {
         painBtn.classList.remove("bg-slate-300");
         painBtn.classList.add("bg-[#fc4c02]");
         painKnob.classList.remove("translate-x-0");
@@ -855,137 +820,145 @@
         painKnob.classList.remove("translate-x-5");
       }
 
-      renderMealsView();
+      const activeSessions = w.sessions.filter(s => s.status !== "off");
+      const doneSessions = activeSessions.filter(s => s.status === "done");
+      const runSessions = activeSessions.filter(s => isRunType(s.type));
+      const totalRunMin = runSessions.reduce((acc, s) => acc + Number(s.duration_min || 0), 0);
+      const doneRunMin = runSessions.filter(s => s.status === "done").reduce((acc, s) => acc + Number(s.duration_min || 0), 0);
+      const pct = totalRunMin > 0 ? Math.min(100, Math.round((doneRunMin / totalRunMin) * 100)) : (activeSessions.length ? Math.round((doneSessions.length / activeSessions.length) * 100) : 0);
+
+      document.getElementById("week-summary").textContent = `${doneSessions.length}/${activeSessions.length} sesiones completadas`;
+      document.getElementById("week-run-progress-label").textContent = `${doneRunMin} / ${totalRunMin} min carrera`;
+      document.getElementById("week-progress-bar").style.width = `${pct}%`;
 
       const container = document.getElementById("days-container");
-      container.innerHTML = sessions.map((s, idx) => {
+      container.innerHTML = w.sessions.map((s, sIdx) => {
         const isDone = s.status === "done";
         const isFailed = s.status === "failed";
         const isOff = s.status === "off";
-        const isRun = isRunType(s.type);
-        const icon = isRun ? ICON_SHOE : (s.type === "Gym" ? ICON_DUMBBELL : ICON_REST);
+        const run = isRunType(s.type);
+        const gym = isGymType(s.type);
 
         const cardBg = isDone
-          ? "bg-emerald-50/90 border-emerald-300"
+          ? "border-emerald-300 bg-emerald-50/90"
           : isFailed
-          ? "bg-red-50/70 border-red-200"
+          ? "border-red-300 bg-red-50/50"
           : isOff
-          ? "bg-white/60 border-[#e2e8f0] opacity-65"
-          : "bg-white border-[#e2e8f0]";
+          ? "border-slate-200/80 bg-white/70 opacity-75"
+          : "border-[#e2e8f0] bg-white";
+
+        const iconBadge = run
+          ? `<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#fc4c02]">${shoeIcon()}</span>`
+          : gym
+          ? `<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">${dumbbellIcon()}</span>`
+          : `<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-[10px] font-extrabold text-slate-400">OFF</span>`;
+
+        const metaParts = [];
+        if (s.duration_min > 0) metaParts.push(`${s.duration_min} min`);
+        if (s.target_hr) metaParts.push(`${s.target_hr} ppm`);
+        if (s.target_pace) metaParts.push(`${s.target_pace}/km`);
 
         return `
-          <div class="rounded-2xl border ${cardBg} p-3.5 shadow-2xs transition-colors" data-idx="${idx}">
-            <div class="flex items-start justify-between gap-3">
-              <div class="flex min-w-0 flex-1 cursor-pointer items-start gap-3 open-details">
-                <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f7f7fa] border border-[#e2e8f0]">
-                  ${icon}
-                </div>
+          <div class="rounded-2xl border ${cardBg} p-3 shadow-2xs transition-colors" data-sidx="${sIdx}">
+            <div class="flex items-center justify-between gap-2.5">
+              <div class="flex min-w-0 flex-1 items-center gap-2.5 cursor-pointer expand-trigger">
+                ${iconBadge}
                 <div class="min-w-0 flex-1">
-                  <div class="flex flex-wrap items-center gap-1.5">
-                    <span class="text-xs font-black uppercase tracking-wide text-slate-900">${s.day}</span>
-                    <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">${s.type}</span>
-                    ${s.minutes > 0 ? `<span class="text-xs font-extrabold text-[#fc4c02]">${s.minutes} min</span>` : ""}
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-extrabold text-slate-900">${s.day}</span>
+                    <span class="text-[11px] font-medium text-slate-400">${s.date.slice(5)}</span>
                     ${isFailed ? `<span class="rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">Fallido</span>` : ""}
                   </div>
-                  <div class="mt-0.5 truncate text-sm font-bold text-slate-900">${s.title}</div>
-                  <div class="mt-0.5 text-xs text-slate-500">${s.target}</div>
+                  <div class="truncate text-xs font-semibold text-slate-800">${s.title}</div>
+                  ${metaParts.length ? `<div class="mt-0.5 text-[11px] font-medium text-slate-500">${metaParts.join(" · ")}</div>` : ""}
                 </div>
               </div>
 
-              <!-- Checkbox cuadrado + menú contextual -->
-              <div class="flex items-center gap-2 shrink-0">
+              <div class="flex shrink-0 items-center gap-1.5">
                 ${!isOff ? `
-                  <input type="checkbox" ${isDone ? "checked" : ""} data-act="toggle-check" aria-label="Completar sesión"
-                    class="h-6 w-6 cursor-pointer rounded-md border-slate-300 accent-emerald-600" />
+                  <button aria-label="Marcar completado" class="check-box-btn flex h-7 w-7 items-center justify-center rounded-lg border-2 transition ${isDone ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent hover:border-[#fc4c02]"}">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </button>
                 ` : ""}
-                <button data-act="toggle-menu" aria-label="Opciones" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-bold">⋮</button>
+                <button aria-label="Opciones del día" class="menu-trigger flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-extrabold">⋮</button>
               </div>
             </div>
 
             <!-- Menú contextual -->
-            <div id="menu-${idx}" class="mt-2.5 hidden rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2">
-              <div class="flex flex-wrap gap-1.5">
-                <button data-act="edit-session" class="rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">Editar</button>
-                <button data-act="add-double" class="rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">+ Doble sesión</button>
-                <button data-act="toggle-off" class="rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">${isOff ? "Activar día" : "Pasar a OFF"}</button>
-                <button data-act="mark-fail" class="rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Marcar fallido</button>
-                <button data-act="swap-day" class="rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">Permutar día</button>
-              </div>
+            <div class="day-menu mt-2.5 hidden flex-wrap gap-1.5 border-t border-slate-100 pt-2.5">
+              <button data-act="edit" class="rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200/60">Editar</button>
+              <button data-act="double" class="rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200/60">+ Doble sesión</button>
+              <button data-act="off" class="rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200/60">${isOff ? "Activar día" : "Pasar a OFF"}</button>
+              <button data-act="fail" class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100">Fallido</button>
+              <button data-act="swap" class="rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200/60">Permutar</button>
             </div>
 
-            <!-- Detalles desplegables al pulsar la tarjeta -->
-            <div id="details-${idx}" class="mt-3 hidden border-t border-slate-200/80 pt-3 space-y-2.5">
-              ${isFailed && s.failReason ? `<div class="rounded-xl bg-red-100/80 px-3 py-2 text-xs font-semibold text-red-800">Motivo registrado: ${s.failReason}</div>` : ""}
+            <!-- Detalles desplegables -->
+            <div class="day-details mt-2.5 hidden space-y-2.5 border-t border-slate-100 pt-2.5 text-xs">
+              ${s.structure ? `<div class="rounded-xl bg-[#f7f7fa] p-2.5 font-semibold text-slate-800">${s.structure}</div>` : ""}
+              ${isFailed && s.failReason ? `<div class="rounded-xl bg-red-50 p-2 text-red-700 font-medium">Motivo: ${s.failReason}</div>` : ""}
 
-              ${s.type === "Gym" ? `
+              ${gym ? `
                 <div class="space-y-2">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-extrabold text-slate-800">Ejercicios (persistentes en próximas semanas)</span>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ejercicios</span>
                     <div class="flex items-center gap-1.5">
-                      <label class="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-xs font-bold text-slate-700 hover:border-[#fc4c02]">
-                        ${ICON_PHOTOS}
-                        <span>Foto rutina</span>
-                        <input type="file" accept="image/*" data-act="gym-img" class="hidden" />
+                      <label aria-label="Leer rutina desde foto" class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] text-slate-700 hover:border-[#fc4c02] hover:text-[#fc4c02]">
+                        ${photoIcon()}
+                        <input type="file" accept="image/*" class="hidden gym-photo-input" />
                       </label>
-                      <button data-act="add-gym-box" class="rounded-xl bg-[#fc4c02] px-2.5 py-1 text-xs font-bold text-white">+ Ejercicio</button>
+                      <button class="add-ex-btn rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-slate-800">+ Ejercicio</button>
                     </div>
                   </div>
 
                   <div class="space-y-2">
                     ${(s.gymExercises || []).map((ex, eIdx) => `
-                      <div class="rounded-xl border ${ex.done ? "border-emerald-300 bg-emerald-50/70" : "border-[#e2e8f0] bg-[#f7f7fa]"} p-2.5" data-eidx="${eIdx}">
+                      <div class="rounded-xl border ${ex.done ? "border-emerald-300 bg-emerald-50/70" : "border-[#e2e8f0] bg-[#f7f7fa]"} p-2.5 space-y-2" data-eidx="${eIdx}">
                         <div class="flex items-center justify-between gap-2">
-                          <input type="text" value="${ex.name}" data-gym-field="name" class="flex-1 rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 text-xs font-bold text-slate-900 focus:border-[#fc4c02] focus:bg-white focus:outline-none" />
-                          <input type="checkbox" ${ex.done ? "checked" : ""} data-act="gym-ex-check" class="h-5 w-5 cursor-pointer rounded accent-emerald-600" />
-                          <button data-act="gym-ex-del" aria-label="Eliminar ejercicio" class="text-xs font-bold text-slate-400 hover:text-red-500 px-1">✕</button>
+                          <input type="text" value="${ex.name}" placeholder="Ejercicio" class="ex-name flex-1 rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold text-slate-900 focus:border-[#fc4c02] focus:outline-none" />
+                          <button aria-label="Completar ejercicio" class="ex-done-btn flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${ex.done ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent"}">✓</button>
+                          <button aria-label="Eliminar ejercicio" class="ex-del-btn px-1.5 text-xs font-bold text-slate-400 hover:text-red-600">✕</button>
                         </div>
-                        <div class="mt-2 grid grid-cols-3 gap-2">
+                        <div class="grid grid-cols-3 gap-1.5">
                           <div>
-                            <span class="block text-[10px] font-bold uppercase text-slate-400">Series</span>
-                            <input type="number" value="${ex.sets}" data-gym-field="sets" class="mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold text-slate-900" />
+                            <span class="block text-[10px] font-semibold text-slate-400">Series</span>
+                            <input type="text" value="${ex.sets}" class="ex-sets mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-[#fc4c02] focus:outline-none" />
                           </div>
                           <div>
-                            <span class="block text-[10px] font-bold uppercase text-slate-400">Reps</span>
-                            <input type="number" value="${ex.reps}" data-gym-field="reps" class="mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold text-slate-900" />
+                            <span class="block text-[10px] font-semibold text-slate-400">Reps</span>
+                            <input type="text" value="${ex.reps}" class="ex-reps mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-[#fc4c02] focus:outline-none" />
                           </div>
                           <div>
-                            <span class="block text-[10px] font-bold uppercase text-slate-400">Peso (kg)</span>
-                            <input type="number" step="0.5" value="${ex.weight}" data-gym-field="weight" class="mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold text-slate-900" />
+                            <span class="block text-[10px] font-semibold text-slate-400">Peso (kg)</span>
+                            <input type="text" value="${ex.weight}" class="ex-weight mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-[#fc4c02] focus:outline-none" />
                           </div>
                         </div>
                       </div>
                     `).join("")}
                   </div>
                 </div>
-              ` : isRun ? `
-                <div class="space-y-2.5">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-600">Auditoría Garmin (recalcula próximas series)</span>
-                    <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-3 py-1.5 text-xs font-bold text-slate-800 hover:border-[#fc4c02]">
-                      ${ICON_PHOTOS}
-                      <span>Subir captura</span>
-                      <input type="file" accept="image/*" multiple data-act="garmin-img" class="hidden" />
-                    </label>
-                  </div>
+              ` : ""}
 
-                  ${s.audit ? `
-                    <div class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-3 text-xs space-y-1.5">
-                      <div class="flex flex-wrap gap-3 font-extrabold text-slate-900">
-                        <span>Dist: ${s.audit.distance}</span>
-                        <span>Tiempo: ${s.audit.time}</span>
-                        <span>Ritmo: ${s.audit.avgPace}</span>
-                        <span>FC: ${s.audit.avgHr} ppm</span>
-                        <span>Cadencia: ${s.audit.avgCadence} ppm</span>
-                      </div>
-                      <div class="font-bold ${Number(s.audit.avgCadence) < 165 ? "text-red-600" : "text-emerald-700"}">
-                        ${Number(s.audit.avgCadence) < 165 ? "⚠️ Cadencia < 165 ppm: acorta zancada y sube frecuencia de paso para proteger la rótula." : "✓ Cadencia ≥ 165 ppm adecuada."}
-                      </div>
-                      <ul class="list-disc pl-4 text-slate-700 space-y-0.5">
-                        <li><strong>Lo mejor:</strong> ${s.audit.best}</li>
-                        <li><strong>A mejorar:</strong> ${s.audit.improve}</li>
-                      </ul>
-                    </div>
-                  ` : `<p class="text-[11px] text-slate-400">Sin datos registrados todavía. Sube una captura de Garmin o sincroniza con Intervals.icu para auditar esta sesión.</p>`}
+              ${run ? `
+                <div class="flex items-center justify-between rounded-xl border border-dashed border-slate-300 bg-[#f7f7fa] px-3 py-2">
+                  <span class="text-[11px] font-semibold text-slate-600">Captura Garmin</span>
+                  <label aria-label="Subir captura Garmin" class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border border-[#e2e8f0] bg-white text-[#fc4c02] shadow-2xs hover:bg-orange-50">
+                    ${photoIcon()}
+                    <input type="file" accept="image/*" multiple class="hidden garmin-photo-input" />
+                  </label>
+                </div>
+              ` : ""}
+
+              ${s.audit ? `
+                <div class="rounded-xl border border-[#e2e8f0] bg-white p-2.5 space-y-1.5">
+                  <div class="font-extrabold text-slate-900">Auditoría del entrenamiento</div>
+                  <div class="text-[11px] font-semibold text-slate-600">
+                    ${s.audit.distance || "-"} · ${s.audit.time || "-"} · Ritmo ${s.audit.avgPace || "-"} · FC ${s.audit.avgHr || "-"} ppm · Cadencia ${s.audit.avgCadence || "-"} ppm
+                  </div>
+                  <ul class="list-disc pl-4 text-xs text-slate-700 space-y-1">
+                    ${(s.audit.points || []).map(pt => `<li>${pt}</li>`).join("")}
+                  </ul>
+                  ${s.audit.nextQualityUpdated ? `<div class="rounded-lg bg-orange-50 px-2.5 py-1.5 text-[11px] font-bold text-[#fc4c02]">Próxima sesión de calidad actualizada: ${s.audit.nextQualityUpdated}</div>` : ""}
                 </div>
               ` : ""}
             </div>
@@ -993,806 +966,500 @@
         `;
       }).join("");
 
-      bindDayEvents();
+      bindDayEvents(container, wIdx);
     }
 
-    function bindDayEvents() {
-      const container = document.getElementById("days-container");
-      const week = getCurrentWeek();
+    function bindDayEvents(container, wIdx) {
+      const w = state.weeks[wIdx];
 
-      container.querySelectorAll(".open-details").forEach(el => {
+      container.querySelectorAll(".expand-trigger").forEach(el => {
         el.addEventListener("click", () => {
-          const idx = el.closest("[data-idx]").dataset.idx;
-          document.getElementById(`details-${idx}`).classList.toggle("hidden");
+          const box = el.closest("[data-sidx]");
+          box.querySelector(".day-details")?.classList.toggle("hidden");
         });
       });
 
-      container.querySelectorAll('input[data-act="toggle-check"]').forEach(chk => {
-        chk.addEventListener("change", async () => {
-          const idx = Number(chk.closest("[data-idx]").dataset.idx);
-          week.sessions[idx].status = chk.checked ? "done" : "pending";
-          await persistState();
+      container.querySelectorAll(".check-box-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const sIdx = Number(btn.closest("[data-sidx]").dataset.sidx);
+          const s = w.sessions[sIdx];
+          s.status = s.status === "done" ? "pending" : "done";
+          await saveState();
           renderWeek();
         });
       });
 
-      container.querySelectorAll("button[data-act]").forEach(btn => {
+      container.querySelectorAll(".menu-trigger").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const box = btn.closest("[data-sidx]");
+          const menu = box.querySelector(".day-menu");
+          menu.classList.toggle("hidden");
+          menu.classList.toggle("flex");
+        });
+      });
+
+      container.querySelectorAll(".day-menu button").forEach(btn => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
-          const idx = Number(btn.closest("[data-idx]").dataset.idx);
-          const s = week.sessions[idx];
+          const sIdx = Number(btn.closest("[data-sidx]").dataset.sidx);
+          const s = w.sessions[sIdx];
           const act = btn.dataset.act;
 
-          if (act === "toggle-menu") {
-            document.getElementById(`menu-${idx}`).classList.toggle("hidden");
-          } else if (act === "toggle-off") {
+          if (act === "off") {
             s.status = s.status === "off" ? "pending" : "off";
-            await persistState();
+            await saveState();
             renderWeek();
-          } else if (act === "mark-fail") {
-            openModal("Marcar sesión como fallida", `
-              <label class="block text-xs font-bold text-slate-600">Motivo (fatiga, horario, molestia articular...)</label>
-              <input id="m-fail-reason" type="text" value="Falta de tiempo" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
-            `, async () => {
-              s.status = "failed";
-              s.failReason = document.getElementById("m-fail-reason").value.trim() || "No completado";
-              await persistState();
-              renderWeek();
-            });
-          } else if (act === "edit-session") {
-            openModal(`Editar ${s.day}`, `
-              <div>
-                <label class="block text-xs font-bold text-slate-600">Título / Estructura</label>
-                <input id="m-ed-title" type="text" value="${s.title}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-600">Duración (min)</label>
-                <input id="m-ed-mins" type="number" value="${s.minutes}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-600">Zona / Objetivo</label>
-                <input id="m-ed-target" type="text" value="${s.target}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
-              </div>
-            `, async () => {
-              s.title = document.getElementById("m-ed-title").value.trim() || s.title;
-              s.minutes = Number(document.getElementById("m-ed-mins").value || 0);
-              s.target = document.getElementById("m-ed-target").value.trim() || s.target;
-              await persistState();
-              renderWeek();
-            });
-          } else if (act === "add-double") {
-            week.sessions.splice(idx + 1, 0, {
-              id: `${s.id}-dbl`, day: `${s.day} (2ª)`, type: "Gym", title: "Core / Movilidad",
-              minutes: 25, target: "Descarga articular", status: "pending", failReason: "", gymKind: "superior", gymExercises: [], audit: null
-            });
-            await persistState();
-            renderWeek();
-          } else if (act === "swap-day") {
-            const opts = week.sessions.map((x, i) => `<option value="${i}">${x.day} (${x.title})</option>`).join("");
-            openModal(`Permutar ${s.day} con...`, `
-              <select id="m-swap-target" class="w-full rounded-xl border border-[#e2e8f0] p-2 text-xs font-bold">${opts}</select>
-            `, async () => {
-              const tIdx = Number(document.getElementById("m-swap-target").value);
-              if (tIdx !== idx) {
-                const dayA = week.sessions[idx].day;
-                const dayB = week.sessions[tIdx].day;
-                const tmp = { ...week.sessions[idx], day: dayB };
-                week.sessions[idx] = { ...week.sessions[tIdx], day: dayA };
-                week.sessions[tIdx] = tmp;
-                await persistState();
+          } else if (act === "fail") {
+            openModal({
+              title: `Marcar fallido · ${s.day}`,
+              bodyHtml: `<label class="block text-xs font-bold text-slate-600">Motivo</label><input id="m-fail-reason" type="text" value="${s.failReason || ""}" placeholder="Fatiga, horario, molestia..." class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />`,
+              confirmText: "Confirmar",
+              onConfirm: async () => {
+                s.status = "failed";
+                s.failReason = document.getElementById("m-fail-reason").value.trim();
+                await saveState();
                 renderWeek();
               }
             });
-          } else if (act === "add-gym-box") {
-            s.gymExercises = s.gymExercises || [];
-            s.gymExercises.push({ name: "Nuevo ejercicio", sets: 3, reps: 10, weight: 0, done: false });
-            propagateGymToFutureWeeks(state.currentWeekIdx, s.gymKind, s.gymExercises);
-            await persistState();
+          } else if (act === "edit") {
+            openModal({
+              title: `Editar · ${s.day}`,
+              bodyHtml: `
+                <label class="block text-xs font-bold text-slate-600">Título / Sesión</label>
+                <input id="m-title" type="text" value="${s.title}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
+                <label class="mt-2 block text-xs font-bold text-slate-600">Estructura / Series</label>
+                <input id="m-struct" type="text" value="${s.structure || ""}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600">Minutos</label>
+                    <input id="m-min" type="number" value="${s.duration_min}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-600">Pulso (ppm)</label>
+                    <input id="m-hr" type="text" value="${s.target_hr || ""}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] p-2 text-xs" />
+                  </div>
+                </div>
+              `,
+              onConfirm: async () => {
+                s.title = document.getElementById("m-title").value.trim() || s.title;
+                s.structure = document.getElementById("m-struct").value.trim();
+                const mins = Number(document.getElementById("m-min").value || 0);
+                s.duration_min = mins;
+                s.base_duration_min = mins;
+                s.target_hr = document.getElementById("m-hr").value.trim();
+                await saveState();
+                renderWeek();
+              }
+            });
+          } else if (act === "double") {
+            w.sessions.splice(sIdx + 1, 0, {
+              id: `${s.id}-double-${Date.now()}`,
+              day: `${s.day} (2ª)`,
+              date: s.date,
+              type: "Gym_Core",
+              title: "Core / Movilidad",
+              duration_min: 25,
+              base_duration_min: 25,
+              status: "pending",
+              gymExercises: cloneExercises(CORE_GYM_EXERCISES)
+            });
+            await saveState();
             renderWeek();
-            document.getElementById(`details-${idx}`).classList.remove("hidden");
-          } else if (act === "gym-ex-del") {
-            const eIdx = Number(btn.closest("[data-eidx]").dataset.eidx);
-            s.gymExercises.splice(eIdx, 1);
-            propagateGymToFutureWeeks(state.currentWeekIdx, s.gymKind, s.gymExercises);
-            await persistState();
-            renderWeek();
-            document.getElementById(`details-${idx}`).classList.remove("hidden");
+          } else if (act === "swap") {
+            const options = w.sessions.map((item, i) => i !== sIdx ? `<option value="${i}">${item.day} · ${item.title}</option>` : "").join("");
+            openModal({
+              title: `Permutar ${s.day} con...`,
+              bodyHtml: `<select id="m-swap-target" class="w-full rounded-xl border border-[#e2e8f0] p-2 text-xs">${options}</select>`,
+              onConfirm: async () => {
+                const tIdx = Number(document.getElementById("m-swap-target").value);
+                if (!Number.isNaN(tIdx) && tIdx !== sIdx) {
+                  const a = w.sessions[sIdx];
+                  const b = w.sessions[tIdx];
+                  const tmpDay = a.day;
+                  const tmpDate = a.date;
+                  a.day = b.day; a.date = b.date;
+                  b.day = tmpDay; b.date = tmpDate;
+                  w.sessions[sIdx] = b;
+                  w.sessions[tIdx] = a;
+                  await saveState();
+                  renderWeek();
+                }
+              }
+            });
           }
         });
       });
 
-      // Cambios en cajas de gimnasio (nombre, series, reps, peso) -> guarda y propaga a semanas futuras
-      container.querySelectorAll("input[data-gym-field]").forEach(inp => {
-        inp.addEventListener("change", async () => {
-          const idx = Number(inp.closest("[data-idx]").dataset.idx);
-          const eIdx = Number(inp.closest("[data-eidx]").dataset.eidx);
-          const field = inp.dataset.gymField;
-          const s = week.sessions[idx];
-          s.gymExercises[eIdx][field] = field === "name" ? inp.value.trim() : Number(inp.value || 0);
-          propagateGymToFutureWeeks(state.currentWeekIdx, s.gymKind, s.gymExercises);
-          await persistState();
-          showToast("Ejercicio actualizado y guardado para próximas semanas.");
-        });
-      });
+      // Eventos de ejercicios de gimnasio (guardan y propagan a futuras semanas)
+      container.querySelectorAll("[data-sidx]").forEach(box => {
+        const sIdx = Number(box.dataset.sidx);
+        const s = w.sessions[sIdx];
 
-      container.querySelectorAll('input[data-act="gym-ex-check"]').forEach(chk => {
-        chk.addEventListener("change", async () => {
-          const idx = Number(chk.closest("[data-idx]").dataset.idx);
-          const eIdx = Number(chk.closest("[data-eidx]").dataset.eidx);
-          week.sessions[idx].gymExercises[eIdx].done = chk.checked;
-          await persistState();
+        box.querySelector(".add-ex-btn")?.addEventListener("click", async () => {
+          s.gymExercises = s.gymExercises || [];
+          s.gymExercises.push({ name: "Nuevo ejercicio", sets: "3", reps: "12", weight: "15", done: false });
+          propagateGymToFutureWeeks(wIdx, s.type, s.gymExercises);
+          await saveState();
           renderWeek();
-          document.getElementById(`details-${idx}`).classList.remove("hidden");
+          box.querySelector(".day-details")?.classList.remove("hidden");
         });
-      });
 
-      // Subida de foto de rutina de gimnasio
-      container.querySelectorAll('input[data-act="gym-img"]').forEach(inp => {
-        inp.addEventListener("change", async (e) => {
-          const idx = Number(inp.closest("[data-idx]").dataset.idx);
-          await parseGymPhoto(idx, e.target.files?.[0]);
-        });
-      });
+        box.querySelectorAll("[data-eidx]").forEach(exCard => {
+          const eIdx = Number(exCard.dataset.eidx);
+          const syncEx = async () => {
+            s.gymExercises[eIdx] = {
+              name: exCard.querySelector(".ex-name").value.trim(),
+              sets: exCard.querySelector(".ex-sets").value.trim(),
+              reps: exCard.querySelector(".ex-reps").value.trim(),
+              weight: exCard.querySelector(".ex-weight").value.trim(),
+              done: s.gymExercises[eIdx].done
+            };
+            propagateGymToFutureWeeks(wIdx, s.type, s.gymExercises);
+            await saveState();
+          };
 
-      // Subida de capturas Garmin
-      container.querySelectorAll('input[data-act="garmin-img"]').forEach(inp => {
-        inp.addEventListener("change", async (e) => {
-          const idx = Number(inp.closest("[data-idx]").dataset.idx);
-          await auditGarminPhotos(idx, e.target.files);
-        });
-      });
-    }
-
-    // =========================================================================
-    // INTEGRACIÓN GEMINI API
-    // =========================================================================
-    async function callGemini(promptText, imagesBase64 = []) {
-      const key = state.profile.geminiKey;
-      if (!key) {
-        showToast("Configura tu Gemini API Key en Perfil (desplegable Claves API).");
-        return null;
-      }
-      const parts = [{ text: promptText }];
-      imagesBase64.forEach(img => parts.push({ inlineData: { mimeType: img.mime, data: img.data } }));
-
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${encodeURIComponent(key)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts }] })
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
-        return json?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-      } catch (err) {
-        showToast(`Error Gemini: ${err.message}`);
-        return null;
-      }
-    }
-
-    async function fileToBase64Obj(file) {
-      return new Promise((resolve) => {
-        const rd = new FileReader();
-        rd.onload = () => resolve({ mime: file.type || "image/jpeg", data: rd.result.split(",")[1] });
-        rd.readAsDataURL(file);
-      });
-    }
-
-    async function parseGymPhoto(idx, file) {
-      if (!file) return;
-      showToast("Leyendo rutina desde imagen...");
-      const imgObj = await fileToBase64Obj(file);
-      const prompt = `Lee los ejercicios de gimnasio de esta imagen y devuelve SOLO un JSON array válido sin markdown con este formato exacto:
-      [{"name":"Nombre ejercicio","sets":3,"reps":12,"weight":0}]`;
-      const raw = await callGemini(prompt, [imgObj]);
-      if (!raw) return;
-      try {
-        const arr = JSON.parse(raw.replace(/```json|```/g, "").trim());
-        const week = getCurrentWeek();
-        week.sessions[idx].gymExercises = arr.map(x => ({
-          name: String(x.name || "Ejercicio"),
-          sets: Number(x.sets) || 3,
-          reps: Number(x.reps) || 10,
-          weight: Number(x.weight) || 0,
-          done: false
-        }));
-        propagateGymToFutureWeeks(state.currentWeekIdx, week.sessions[idx].gymKind, week.sessions[idx].gymExercises);
-        await persistState();
-        renderWeek();
-        document.getElementById(`details-${idx}`).classList.remove("hidden");
-        showToast("Rutina creada y guardada para futuras semanas.");
-      } catch {
-        showToast("No se pudo interpretar la tabla de ejercicios de la imagen.");
-      }
-    }
-
-    async function auditGarminPhotos(idx, fileList) {
-      if (!fileList || !fileList.length) return;
-      showToast("Auditando captura Garmin y recalculando próximas series...");
-      const imgs = [];
-      for (const f of fileList) imgs.push(await fileToBase64Obj(f));
-
-      const week = getCurrentWeek();
-      const s = week.sessions[idx];
-      let nextQualityInfo = null;
-      for (let w = state.currentWeekIdx; w < TOTAL_WEEKS; w++) {
-        const wk = getWeekByIndex(w);
-        const qIdx = wk.sessions.findIndex((x, i) => (w > state.currentWeekIdx || i > idx) && (x.type === "Series" || x.type === "Tempo") && x.status !== "done");
-        if (qIdx >= 0) {
-          nextQualityInfo = { wIdx: w, sIdx: qIdx, session: wk.sessions[qIdx] };
-          break;
-        }
-      }
-
-      const prompt = `Eres un entrenador de running directo, sin peloteo.
-      Perfil atleta: 183 cm, ${state.profile.weight} kg, Zonas: ${state.profile.zones}, Cadencia mínima: 165 ppm, Objetivo Media Maratón Sub-2h (< 5:40/km; reloj ≤ 5:38/km).
-      Sesión realizada: "${s.title}" (Objetivo planificado: "${s.target}").
-      Próxima sesión de calidad pendiente: ${nextQualityInfo ? JSON.stringify(nextQualityInfo.session) : "ninguna"}.
-      Analiza las capturas de Garmin y devuelve SOLO un JSON válido sin markdown con esta estructura exacta:
-      {
-        "distance": "ej. 7,8 km",
-        "time": "ej. 43:10",
-        "avgPace": "ej. 5:32 /km",
-        "avgHr": 154,
-        "avgCadence": 166,
-        "best": "punto concreto positivo",
-        "improve": "desviación de pulso, ritmo o cadencia sin adornos",
-        "estimated21kSec": 336,
-        "estimated21kLabel": "5:36",
-        "confidence": "Media",
-        "nextSeriesTitle": "título concreto con bloques exactos (ej. Calidad: 5x4' VT2)",
-        "nextSeriesTarget": "estructura concreta en minutos y ppm"
-      }`;
-
-      const raw = await callGemini(prompt, imgs);
-      if (!raw) return;
-      try {
-        const data = JSON.parse(raw.replace(/```json|```/g, "").trim());
-        s.audit = data;
-        s.status = "done";
-
-        if (data.estimated21kSec && data.estimated21kLabel) {
-          state.paceLogs.push({
-            date: new Date().toISOString().slice(0, 10),
-            paceSec: Number(data.estimated21kSec),
-            label: String(data.estimated21kLabel),
-            confidence: String(data.confidence || "Media"),
-            bullets: [data.best, data.improve]
+          exCard.querySelectorAll("input").forEach(inp => inp.addEventListener("change", syncEx));
+          exCard.querySelector(".ex-done-btn")?.addEventListener("click", async () => {
+            s.gymExercises[eIdx].done = !s.gymExercises[eIdx].done;
+            await saveState();
+            renderWeek();
+            box.querySelector(".day-details")?.classList.remove("hidden");
           });
-        }
+          exCard.querySelector(".ex-del-btn")?.addEventListener("click", async () => {
+            s.gymExercises.splice(eIdx, 1);
+            propagateGymToFutureWeeks(wIdx, s.type, s.gymExercises);
+            await saveState();
+            renderWeek();
+            box.querySelector(".day-details")?.classList.remove("hidden");
+          });
+        });
 
-        if (nextQualityInfo && data.nextSeriesTitle && data.nextSeriesTarget) {
-          const targetWk = getWeekByIndex(nextQualityInfo.wIdx);
-          targetWk.sessions[nextQualityInfo.sIdx].title = data.nextSeriesTitle;
-          targetWk.sessions[nextQualityInfo.sIdx].target = data.nextSeriesTarget;
-        }
+        // Leer rutina desde captura de imagen con Gemini
+        box.querySelector(".gym-photo-input")?.addEventListener("change", async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const b64 = await fileToBase64(file);
+          const prompt = `Lee esta imagen de rutina de gimnasio y extrae los ejercicios.
+          Devuelve ÚNICAMENTE un JSON array válido sin markdown:
+          [{"name":"Nombre ejercicio","sets":"3","reps":"10","weight":"20"}]`;
+          const raw = await callGemini(prompt, [{ mime: file.type || "image/jpeg", data: b64 }]);
+          if (!raw) return;
+          try {
+            const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+            if (Array.isArray(parsed) && parsed.length) {
+              s.gymExercises = parsed.map(x => ({
+                name: String(x.name || "Ejercicio"),
+                sets: String(x.sets || "3"),
+                reps: String(x.reps || "10"),
+                weight: String(x.weight || "0"),
+                done: false
+              }));
+              propagateGymToFutureWeeks(wIdx, s.type, s.gymExercises);
+              await saveState();
+              renderWeek();
+              box.querySelector(".day-details")?.classList.remove("hidden");
+              showToast("Rutina creada en cajas y guardada para futuras semanas.");
+            }
+          } catch {
+            showToast("No se pudo interpretar la imagen de rutina.");
+          }
+        });
 
-        await persistState();
-        renderWeek();
-        renderProgress();
-        document.getElementById(`details-${idx}`).classList.remove("hidden");
-        showToast("Entreno auditado, ritmo estimado actualizado y próximas series recalculadas.");
-      } catch {
-        showToast("Error leyendo respuesta de auditoría Garmin.");
-      }
+        // Auditoría de captura Garmin + recálculo de próximas series concretas
+        box.querySelector(".garmin-photo-input")?.addEventListener("change", async (e) => {
+          const files = Array.from(e.target.files || []);
+          if (!files.length) return;
+          const imgs = [];
+          for (const f of files) {
+            imgs.push({ mime: f.type || "image/jpeg", data: await fileToBase64(f) });
+          }
+          const nextQuality = findNextQualitySession(wIdx, sIdx);
+          const prompt = `Eres un entrenador de running directo, sin peloteo. Analiza estas capturas de Garmin para la sesión "${s.title}" (objetivo pulso: ${s.target_hr || "148-155"} ppm, cadencia mínima: ${state.profile.cadence || 165} ppm).
+          Próxima sesión de calidad en el plan: "${nextQuality ? nextQuality.title : "Ninguna"}" (estructura actual: "${nextQuality ? nextQuality.structure : ""}").
+          Devuelve ÚNICAMENTE un JSON válido sin markdown con esta estructura:
+          {
+            "distance":"...",
+            "time":"...",
+            "avgPace":"5:25",
+            "avgHr":152,
+            "avgCadence":166,
+            "points":["viñeta directa sobre zona FC y ejecución","viñeta de cadencia/protección rotuliana si <165 ppm"],
+            "nextQualityStructure":"bloque concreto de series para la próxima sesión de calidad, ej: 10' Z2 + 5x4' en VT2 (165-168 ppm) rec 2' trote + 6' Z2"
+          }`;
+          const raw = await callGemini(prompt, imgs);
+          if (!raw) return;
+          try {
+            const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+            const cad = Number(parsed.avgCadence || 0);
+            const points = Array.isArray(parsed.points) ? [...parsed.points] : [];
+            if (cad > 0 && cad < (state.profile.cadence || 165)) {
+              points.push(`Cadencia media ${cad} ppm (< 165 ppm): sube frecuencia de paso y acorta zancada para proteger la rótula.`);
+            }
+            s.audit = {
+              distance: parsed.distance,
+              time: parsed.time,
+              avgPace: parsed.avgPace,
+              avgHr: parsed.avgHr,
+              avgCadence: parsed.avgCadence,
+              points
+            };
+            s.status = "done";
+
+            if (nextQuality && parsed.nextQualityStructure) {
+              nextQuality.structure = parsed.nextQualityStructure;
+              s.audit.nextQualityUpdated = `${nextQuality.day}: ${parsed.nextQualityStructure}`;
+            }
+
+            state.runActivities.push({
+              date: s.date,
+              title: s.title,
+              pace: parsed.avgPace,
+              hr: Number(parsed.avgHr || 0),
+              cadence: cad
+            });
+            recomputeDeterministicPace(s.date, parsed.avgPace, Number(parsed.avgHr || 0));
+
+            await saveState();
+            renderWeek();
+            renderProgress();
+            box.querySelector(".day-details")?.classList.remove("hidden");
+            showToast("Entreno auditado y próximas series recalculadas.");
+          } catch {
+            showToast("No se pudo leer la captura de Garmin.");
+          }
+        });
+      });
     }
 
-    // Reajuste semanal en lenguaje natural con confirmación
-    document.getElementById("ai-adapt-run").addEventListener("click", async () => {
-      const text = document.getElementById("ai-adapt-input").value.trim();
-      if (!text) return;
-      const week = getCurrentWeek();
-      const prompt = `Entrenador directo sin peloteo. Semana actual: ${JSON.stringify(week.sessions)}.
-      Petición: "${text}".
-      Reglas duras: programar por tiempo (min); tirada larga en sábado salvo petición; gym pierna nunca antes de tirada larga; si reporta molestia en cintilla o articulación, activar painCut50=true (-50% volumen carrera); mantener status="done" intacto; en sesiones de calidad especificar series concretas por tiempo y pulso (nunca "intervalos" genérico).
-      Devuelve SOLO JSON válido sin markdown:
-      {"summary":"resumen corto","painCut50":false,"sessions":[...array completo actualizado...]}`;
-      const raw = await callGemini(prompt);
-      if (!raw) return;
-      try {
-        const prop = JSON.parse(raw.replace(/```json|```/g, "").trim());
-        const box = document.getElementById("ai-adapt-proposal");
-        box.innerHTML = `
-          <div class="rounded-xl border border-[#fc4c02]/40 bg-orange-50/60 p-3 text-xs space-y-2">
-            <p class="font-semibold text-slate-800">${prop.summary}</p>
-            <button id="confirm-ai-adapt" class="rounded-lg bg-[#fc4c02] px-3 py-1.5 font-bold text-white">Confirmar y aplicar</button>
-          </div>
-        `;
-        document.getElementById("confirm-ai-adapt").addEventListener("click", async () => {
-          week.painCut50 = Boolean(prop.painCut50);
-          week.sessions = prop.sessions.map((ns, i) =>
-            week.sessions[i]?.status === "done" ? week.sessions[i] : { ...week.sessions[i], ...ns }
-          );
-          box.innerHTML = "";
-          document.getElementById("ai-adapt-input").value = "";
-          await persistState();
-          renderWeek();
-          showToast("Semana actualizada.");
-        });
-      } catch {
-        showToast("No se pudo interpretar la propuesta de IA.");
+    function findNextQualitySession(fromW, fromS) {
+      for (let w = fromW; w < state.weeks.length; w++) {
+        const start = w === fromW ? fromS + 1 : 0;
+        for (let i = start; i < state.weeks[w].sessions.length; i++) {
+          const item = state.weeks[w].sessions[i];
+          if (item.status !== "done" && ["Run_Tempo", "Run_Intervals", "Run_Activation"].includes(item.type)) {
+            return item;
+          }
+        }
       }
-    });
+      return null;
+    }
 
-    // Sincronización con Intervals.icu
-    document.getElementById("sync-intervals-btn").addEventListener("click", async () => {
-      const id = state.profile.intervalsId;
-      const key = state.profile.intervalsKey;
-      if (!id || !key) {
-        showToast("Introduce tu Athlete ID y API Key de Intervals.icu en Perfil.");
-        return;
-      }
-      try {
-        const res = await fetch(`https://intervals.icu/api/v1/athlete/${encodeURIComponent(id)}/activities?oldest=2026-11-16`, {
-          headers: { Authorization: "Basic " + btoa(`API_KEY:${key}`) }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const acts = await res.json();
-        showToast(`Intervals.icu conectado: ${acts.length} actividades detectadas.`);
-      } catch (err) {
-        showToast(`Intervals.icu bloqueó la llamada directa desde el navegador (CORS): ${err.message}. Usa la subida de captura Garmin dentro de cada sesión.`);
-      }
-    });
+    function paceToSec(pStr) {
+      const m = String(pStr || "").match(/(\d+):(\d{2})/);
+      if (!m) return null;
+      return Number(m[1]) * 60 + Number(m[2]);
+    }
 
-    // =========================================================================
-    // PESTAÑA PROGRESO (Sin datos inventados ni petición de tests)
-    // =========================================================================
+    function secToPace(sec) {
+      const s = Math.max(210, Math.round(sec));
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    }
+
+    // Cálculo determinista únicamente cuando existen entrenamientos reales registrados
+    function recomputeDeterministicPace(dateStr, paceStr, hrVal) {
+      const sec = paceToSec(paceStr);
+      if (!sec) return;
+      // Ajuste ligero de esfuerzo/pulso hacia ritmo proyectado 21K con margen GPS (~1%)
+      const hrFactor = hrVal > 168 ? 1.02 : (hrVal > 0 && hrVal < 148 ? 0.98 : 1.0);
+      const projectedSec = Math.round(sec * hrFactor * 1.01);
+      state.paceHistory.push({ date: dateStr, sec: projectedSec, label: secToPace(projectedSec) });
+      state.paceBullets = [
+        `Ritmo registrado (${paceStr}/km) con pulso medio ${hrVal || "-"} ppm y margen operativo de reloj (~1%).`,
+        `Referencia objetivo Media Maratón Sub-2h: ≤ 5:38/km en reloj (< 5:40/km oficial).`
+      ];
+    }
+
     function renderProgress() {
       const paceValEl = document.getElementById("est-pace-val");
       const paceConfEl = document.getElementById("est-pace-conf");
-      const paceBtnEl = document.getElementById("toggle-pace-chart");
       const paceNoteEl = document.getElementById("est-pace-note");
+      const paceChartBtn = document.getElementById("toggle-pace-chart");
       const bulletsEl = document.getElementById("pace-ai-bullets");
 
-      if (!state.paceLogs || state.paceLogs.length === 0) {
+      if (!state.paceHistory.length) {
         paceValEl.textContent = "Sin datos registrados";
         paceConfEl.classList.add("hidden");
-        paceBtnEl.classList.add("hidden");
+        paceChartBtn.classList.add("hidden");
+        document.getElementById("pace-chart-wrap").classList.add("hidden");
         paceNoteEl.textContent = "Aún no hay entrenamientos registrados. Sube tu primera carrera desde Garmin o Intervals.icu para calcular el ritmo objetivo estimado.";
+        bulletsEl.innerHTML = "";
       } else {
-        const last = state.paceLogs[state.paceLogs.length - 1];
+        const last = state.paceHistory[state.paceHistory.length - 1];
         paceValEl.textContent = `${last.label} /km`;
-        paceConfEl.textContent = `Confianza: ${last.confidence}`;
+        paceConfEl.textContent = state.paceHistory.length >= 3 ? "Confianza media" : "Confianza inicial";
         paceConfEl.classList.remove("hidden");
-        paceBtnEl.classList.remove("hidden");
-        paceNoteEl.textContent = "Estimación calculada a partir de tus entrenamientos reales registrados.";
-        bulletsEl.innerHTML = (last.bullets || []).map(b => `<li>${b}</li>`).join("");
-        drawSvgLine("pace-svg", state.paceLogs.map(x => ({ x: x.date.slice(5), y: x.paceSec })), true);
+        paceChartBtn.classList.remove("hidden");
+        paceNoteEl.textContent = "Proyección estimada para 21,1 km a partir de tus entrenamientos registrados (objetivo reloj ≤ 5:38/km).";
+        bulletsEl.innerHTML = (state.paceBullets || []).map(b => `<li>${b}</li>`).join("");
+        drawLineSvg("pace-svg", state.paceHistory.map(p => ({ label: p.date.slice(5), value: p.sec, text: p.label })), true);
       }
 
-      const lastW = state.weightLogs[state.weightLogs.length - 1];
-      const wStr = `${String(lastW.weight).replace(".", ",")} kg`;
-      document.getElementById("current-weight-pill").textContent = wStr;
-      document.getElementById("header-status").textContent = `${wStr} · Obj. 1:51:00–1:54:00 · Cadencia ≥ ${state.profile.cadence || 165} ppm`;
+      const curW = String(state.profile.weight).replace(".", ",");
+      document.getElementById("current-weight-pill").textContent = `${curW} kg`;
+      drawLineSvg("weight-svg", state.weightLogs.map(w => ({ label: w.date.slice(5), value: Number(w.weight), text: String(w.weight).replace(".", ",") })), false);
 
-      drawSvgLine("weight-svg", state.weightLogs.map(x => ({ x: x.date.slice(5), y: Number(x.weight) })), false);
-      document.getElementById("weight-list").innerHTML = [...state.weightLogs].reverse().slice(0, 6).map(w => `
-        <li class="flex items-center justify-between border-b border-slate-100 pb-1">
-          <span><strong>${w.date}</strong> · ${w.note || "Registro"}</span>
-          <span class="font-extrabold text-slate-900">${String(w.weight).replace(".", ",")} kg</span>
-        </li>
-      `).join("");
+      document.getElementById("weight-list").innerHTML = [...state.weightLogs].reverse().slice(0, 6).map(w =>
+        `<li class="flex justify-between rounded-lg bg-[#f7f7fa] px-2.5 py-1.5"><span><strong>${w.date}</strong> · ${w.note || "Registro"}</span><span class="font-bold text-slate-900">${String(w.weight).replace(".", ",")} kg</span></li>`
+      ).join("");
     }
 
-    function drawSvgLine(svgId, pts, invertY) {
+    function drawLineSvg(svgId, points, invertY) {
       const svg = document.getElementById(svgId);
-      if (!pts.length) return;
-      const ys = pts.map(p => p.y);
-      const minY = Math.min(...ys) - 0.8;
-      const maxY = Math.max(...ys) + 0.8;
-
-      const coords = pts.map((p, i) => {
-        const x = pts.length === 1 ? 170 : 32 + (i / (pts.length - 1)) * 276;
-        const norm = (p.y - minY) / (maxY - minY || 1);
-        const y = invertY ? 24 + norm * 106 : 130 - norm * 106;
-        const label = invertY ? `${Math.floor(p.y / 60)}:${String(p.y % 60).padStart(2, "0")}` : `${p.y}`;
-        return { x, y, label, date: p.x };
+      if (!svg || !points.length) return;
+      const vals = points.map(p => p.value);
+      const minV = Math.min(...vals) - 0.5;
+      const maxV = Math.max(...vals) + 0.5;
+      const coords = points.map((p, i) => {
+        const x = points.length === 1 ? 170 : 32 + (i / (points.length - 1)) * 276;
+        const norm = (p.value - minV) / (maxV - minV || 1);
+        const y = invertY ? 26 + norm * 96 : 122 - norm * 96;
+        return { x, y, text: p.text, label: p.label };
       });
-
       const poly = coords.map(c => `${c.x},${c.y}`).join(" ");
       svg.innerHTML = `
-        <line x1="20" y1="136" x2="320" y2="136" stroke="#e2e8f0" stroke-width="1" />
         <polyline fill="none" stroke="#fc4c02" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${poly}" />
         ${coords.map(c => `
-          <circle cx="${c.x}" cy="${c.y}" r="4.5" fill="#fc4c02" stroke="#ffffff" stroke-width="1.5" />
-          <text x="${c.x}" y="${c.y - 9}" fill="#0f172a" font-size="10" font-weight="700" text-anchor="middle">${c.label}</text>
-          <text x="${c.x}" y="150" fill="#64748b" font-size="9" text-anchor="middle">${c.date}</text>
+          <circle cx="${c.x}" cy="${c.y}" r="4.5" fill="#fc4c02" />
+          <text x="${c.x}" y="${c.y - 9}" fill="#0f172a" font-size="10" font-weight="700" text-anchor="middle">${c.text}</text>
+          <text x="${c.x}" y="148" fill="#64748b" font-size="9" text-anchor="middle">${c.label}</text>
         `).join("")}
       `;
     }
 
-    document.getElementById("toggle-pace-chart").addEventListener("click", () => {
-      document.getElementById("pace-chart-wrap").classList.toggle("hidden");
-    });
-
-    document.getElementById("add-weight-btn").addEventListener("click", async () => {
-      const val = parseFloat(document.getElementById("new-weight-val").value);
-      if (!val || val < 40 || val > 180) return;
-      const note = document.getElementById("new-weight-note").value.trim();
-      const today = new Date().toISOString().slice(0, 10);
-      state.weightLogs.push({ date: today, weight: val, note });
-      state.profile.weight = val;
-      document.getElementById("new-weight-val").value = "";
-      document.getElementById("new-weight-note").value = "";
-      await persistState();
-      renderProgress();
-      renderProfile();
-      showToast(`Peso registrado: ${String(val).replace(".", ",")} kg`);
-    });
-
-    // =========================================================================
-    // PESTAÑA CONSULTOR IA Y COMIDAS (Con desplegable + arrastre horizontal)
-    // =========================================================================
-    document.getElementById("chat-send-btn").addEventListener("click", async () => {
-      const q = document.getElementById("chat-input").value.trim();
-      if (!q) return;
-      const hist = document.getElementById("chat-history");
-      const item = document.createElement("div");
-      item.className = "rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-3 text-xs space-y-1.5";
-      item.innerHTML = `<div class="font-bold text-slate-900">Tú: ${q}</div><div class="text-slate-400">Analizando...</div>`;
-      hist.prepend(item);
-      document.getElementById("chat-input").value = "";
-
-      const prompt = `Entrenador personal de Jose Couto (183 cm, ${state.profile.weight} kg, objetivo Media Maratón 1:51-1:54, zonas ${state.profile.zones}, cadencia mínima 165 ppm).
-      Reglas obligatorias: Cero peloteo, respuestas directas y realistas en viñetas cortas. Si reporta molestia en cintilla o articulación, aplica recorte automático del 50% en volumen de carrera y prioriza protección articular. No recomiendes suplementos sin contexto.
-      Consulta: "${q}"`;
-
-      const ans = await callGemini(prompt);
-      if (ans) {
-        item.innerHTML = `<div class="font-bold text-slate-900">Tú: ${q}</div><div class="whitespace-pre-line text-slate-700 leading-relaxed">${ans}</div>`;
-      } else {
-        item.remove();
-      }
-    });
-
     function renderMealsView() {
-      const mIdx = Math.max(0, Math.min(TOTAL_WEEKS - 1, state.mealsWeekIdx ?? state.currentWeekIdx));
-      state.mealsWeekIdx = mIdx;
-      const mSel = document.getElementById("meals-week-select");
-      if (mSel) mSel.value = mIdx;
-
-      const targetWeek = getWeekByIndex(mIdx);
-      const runMins = targetWeek.sessions.filter(s => s.status !== "off" && isRunType(s.type))
-        .reduce((acc, s) => acc + Number(s.minutes || 0), 0);
-      const isRaceWeek = mIdx === TOTAL_WEEKS - 1;
-
-      document.getElementById("meals-week-ref").textContent =
-        `${getWeekLabel(mIdx)} · ${runMins} min de carrera${isRaceWeek ? " · Semana de Competición" : ""}`;
-
-      const out = document.getElementById("meals-output");
-      const savedHtml = state.mealsByWeek?.[mIdx];
-      if (savedHtml) {
-        out.innerHTML = savedHtml;
-      } else {
-        const satSess = targetWeek.sessions.find(x => x.day === "Sábado");
-        const satMin = satSess?.minutes || 0;
-        out.innerHTML = `
-          <ul class="list-disc space-y-1.5 pl-4 text-slate-700">
-            <li><strong>Lunes (Gym Pierna):</strong> Proteína alta + carbohidrato moderado peri-entreno en déficit controlado.</li>
-            <li><strong>Martes y Jueves (Carrera):</strong> Pre-entreno ligero; cena alta en proteína y verdura para pérdida de grasa.</li>
-            <li><strong>Sábado (${satSess?.title || "Tirada Larga"} · ${satMin} min):</strong> ${satMin > 0 ? `Desayuno de hidratos fáciles 90 min antes. ${satMin >= 75 ? "Probar 1 gel de 25-30g HC a los 45 min con agua." : "Hidratación con agua."}` : "Sin tirada larga; alimentación normocalórica ligera."}</li>
-            ${isRaceWeek ? "<li class='font-semibold text-slate-900'><strong>Domingo 28/02 (Media Maratón):</strong> Carga de hidratos jueves-sábado y pauta de geles cada 35-40 min en prueba.</li>" : ""}
-          </ul>
-          <p class="mt-2.5 text-[11px] text-slate-400">Desliza horizontalmente para cambiar de semana o pulsa <strong>Generar IA</strong> para detallar los 7 días.</p>
-        `;
-      }
+      const mIdx = state.mealsWeekIdx;
+      document.getElementById("meals-week-select").value = mIdx;
+      const w = state.weeks[mIdx];
+      const runMin = w.sessions.filter(s => isRunType(s.type) && s.status !== "off").reduce((a, b) => a + Number(b.duration_min || 0), 0);
+      document.getElementById("meals-week-ref").textContent = `${runMin} min carrera · ${w.phase}`;
+      const saved = state.mealsByWeek[mIdx];
+      document.getElementById("meals-output").innerHTML = saved
+        ? `<div class="whitespace-pre-line">${saved}</div>`
+        : `<p class="text-slate-400">Pulsa <strong>Generar IA</strong> o desliza entre semanas para crear y revisar la propuesta de comidas de ${w.start_date.slice(5)} a ${w.end_date.slice(5)}.</p>`;
     }
-
-    document.getElementById("gen-meals-btn").addEventListener("click", async () => {
-      const mIdx = state.mealsWeekIdx ?? state.currentWeekIdx;
-      const out = document.getElementById("meals-output");
-      const week = getWeekByIndex(mIdx);
-      const isRaceWeek = mIdx === TOTAL_WEEKS - 1;
-
-      if (!state.profile.geminiKey) {
-        showToast("Configura tu Gemini API Key en Perfil para generar la pauta detallada con IA.");
-        return;
-      }
-
-      out.innerHTML = `<p class="text-slate-400">Generando pauta para ${getWeekLabel(mIdx)}...</p>`;
-      const prompt = `Genera pauta semanal de comidas genéricas (Lunes a Domingo) para corredor de ${state.profile.weight} kg (objetivo pérdida de grasa y Media Maratón Sub-2h).
-      Entrenos de esta semana (${getWeekLabel(mIdx)}): ${JSON.stringify(week.sessions.map(s => ({ dia: s.day, tipo: s.type, titulo: s.title, min: s.minutes })))}.
-      ${isRaceWeek ? "ES SEMANA DE CARRERA (Domingo 28/02): carga de hidratos previa y estrategia de geles/hidratación para el 21K." : "Integra geles solo en tiradas largas ≥ 75 min. Cero suplementos innecesarios."}
-      Lista escaneable por día, tono sobrio.`;
-      const ans = await callGemini(prompt);
-      if (ans) {
-        const formatted = `<div class="whitespace-pre-line leading-relaxed">${ans}</div>`;
-        state.mealsByWeek = state.mealsByWeek || {};
-        state.mealsByWeek[mIdx] = formatted;
-        await persistState();
-        out.innerHTML = formatted;
-      }
-    });
-
-    document.getElementById("meals-prev-week").addEventListener("click", async () => {
-      if ((state.mealsWeekIdx ?? 0) > 0) {
-        state.mealsWeekIdx -= 1;
-        await persistState();
-        renderMealsView();
-      }
-    });
-
-    document.getElementById("meals-next-week").addEventListener("click", async () => {
-      if ((state.mealsWeekIdx ?? 0) < TOTAL_WEEKS - 1) {
-        state.mealsWeekIdx += 1;
-        await persistState();
-        renderMealsView();
-      }
-    });
-
-    document.getElementById("meals-week-select").addEventListener("change", async (e) => {
-      state.mealsWeekIdx = Number(e.target.value);
-      await persistState();
-      renderMealsView();
-    });
-
-    let mealsStartX = 0;
-    let mealsDragging = false;
-    const mealsSwipeEl = document.getElementById("meals-swipe-area");
-    mealsSwipeEl.addEventListener("touchstart", e => { mealsStartX = e.changedTouches[0].screenX; }, { passive: true });
-    mealsSwipeEl.addEventListener("touchend", async e => {
-      const diff = e.changedTouches[0].screenX - mealsStartX;
-      if (Math.abs(diff) > 55) {
-        const next = Math.max(0, Math.min(TOTAL_WEEKS - 1, (state.mealsWeekIdx ?? 0) + (diff < 0 ? 1 : -1)));
-        if (next !== state.mealsWeekIdx) {
-          state.mealsWeekIdx = next;
-          await persistState();
-          renderMealsView();
-        }
-      }
-    }, { passive: true });
-    mealsSwipeEl.addEventListener("mousedown", e => { mealsStartX = e.screenX; mealsDragging = true; });
-    mealsSwipeEl.addEventListener("mouseup", async e => {
-      if (!mealsDragging) return;
-      mealsDragging = false;
-      const diff = e.screenX - mealsStartX;
-      if (Math.abs(diff) > 55) {
-        const next = Math.max(0, Math.min(TOTAL_WEEKS - 1, (state.mealsWeekIdx ?? 0) + (diff < 0 ? 1 : -1)));
-        if (next !== state.mealsWeekIdx) {
-          state.mealsWeekIdx = next;
-          await persistState();
-          renderMealsView();
-        }
-      }
-    });
-
-    // =========================================================================
-    // PESTAÑA PERFIL (Objetivos arriba del todo + cajitas de zonas y días)
-    // =========================================================================
-    const WEEK_DAYS_LIST = [
-      { full: "Lunes", short: "L" },
-      { full: "Martes", short: "M" },
-      { full: "Miércoles", short: "X" },
-      { full: "Jueves", short: "J" },
-      { full: "Viernes", short: "V" },
-      { full: "Sábado", short: "S" },
-      { full: "Domingo", short: "D" }
-    ];
-
-    function renderDayPills(containerId, selectedDays, onToggle) {
-      const el = document.getElementById(containerId);
-      if (!el) return;
-      el.innerHTML = WEEK_DAYS_LIST.map(d => {
-        const active = selectedDays.includes(d.full);
-        return `
-          <button type="button" data-day="${d.full}" class="rounded-xl border py-2 text-xs font-extrabold transition ${active ? "border-[#fc4c02] bg-[#fc4c02] text-white shadow-2xs" : "border-[#e2e8f0] bg-[#f7f7fa] text-slate-600 hover:bg-slate-200/70"}">
-            ${d.short}
-          </button>
-        `;
-      }).join("");
-      el.querySelectorAll("button[data-day]").forEach(btn => {
-        btn.addEventListener("click", () => onToggle(btn.dataset.day));
-      });
-    }
-
-    document.getElementById("toggle-new-goal").addEventListener("click", () => {
-      document.getElementById("new-goal-form").classList.toggle("hidden");
-    });
-    document.getElementById("toggle-keys-panel").addEventListener("click", () => {
-      document.getElementById("keys-panel").classList.toggle("hidden");
-    });
 
     function renderProfile() {
       const p = state.profile;
-      document.getElementById("p-height").value = p.height || 183;
-      document.getElementById("p-weight").value = p.weight || 85.1;
-      document.getElementById("p-cadence").value = p.cadence || 165;
-
-      document.getElementById("z-vt1").value = p.zoneVt1 || "141-148";
-      document.getElementById("z-z2").value = p.zoneZ2 || "148-155";
-      document.getElementById("z-tempo").value = p.zoneTempo || "158-164";
-      document.getElementById("z-vt2").value = p.zoneVt2 || "165-168";
-      document.getElementById("z-vo2").value = p.zoneVo2 || "187";
-
-      p.runDays = Array.isArray(p.runDays) ? p.runDays : ["Martes", "Jueves", "Sábado"];
-      p.gymDays = Array.isArray(p.gymDays) ? p.gymDays : ["Lunes", "Miércoles", "Viernes"];
-
-      renderDayPills("pref-run-days", p.runDays, (day) => {
-        p.runDays = p.runDays.includes(day) ? p.runDays.filter(x => x !== day) : [...p.runDays, day];
-        renderProfile();
-      });
-      renderDayPills("pref-gym-days", p.gymDays, (day) => {
-        p.gymDays = p.gymDays.includes(day) ? p.gymDays.filter(x => x !== day) : [...p.gymDays, day];
-        renderProfile();
-      });
-
+      document.getElementById("p-height").value = p.height;
+      document.getElementById("p-weight").value = p.weight;
+      document.getElementById("p-cadence").value = p.cadence;
+      document.getElementById("z-vt1").value = p.zones.vt1;
+      document.getElementById("z-z2").value = p.zones.z2;
+      document.getElementById("z-tempo").value = p.zones.tempo;
+      document.getElementById("z-vt2").value = p.zones.vt2;
+      document.getElementById("z-vo2").value = p.zones.vo2;
       document.getElementById("p-notes").value = p.notes || "";
       document.getElementById("k-gemini").value = p.geminiKey || "";
       document.getElementById("k-int-id").value = p.intervalsId || "";
       document.getElementById("k-int-key").value = p.intervalsKey || "";
 
-      const activeGoal = state.goals.find(g => g.active) || state.goals[0];
-      if (activeGoal) {
-        document.getElementById("header-goal").textContent = `${activeGoal.name} (${activeGoal.pace}/km)`;
-      }
-
+      // Objetivos arriba del todo
       document.getElementById("goals-list").innerHTML = state.goals.map(g => `
-        <div class="flex items-center justify-between py-2.5">
+        <div class="flex items-center justify-between py-2">
           <div>
             <div class="text-xs font-extrabold text-slate-900">${g.name}</div>
-            <div class="text-[11px] text-slate-500">Ritmo: ${g.pace}/km · Fecha: ${g.date}</div>
+            <div class="text-[11px] text-slate-500">Ritmo ${g.pace}/km · Fecha ${g.date}</div>
           </div>
           ${g.active
-            ? `<span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">Activo</span>`
-            : `<button data-goal-id="${g.id}" class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-xs font-bold text-slate-700 hover:border-[#fc4c02]">Activar</button>`}
+            ? `<span class="rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold text-[#fc4c02]">Activo</span>`
+            : `<button data-gid="${g.id}" class="activate-goal-btn rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200/70">Activar</button>`
+          }
         </div>
       `).join("");
 
-      document.querySelectorAll("button[data-goal-id]").forEach(btn => {
+      document.querySelectorAll(".activate-goal-btn").forEach(btn => {
         btn.addEventListener("click", async () => {
-          state.goals.forEach(g => { g.active = g.id === btn.dataset.goalId; });
-          await persistState();
+          state.goals.forEach(g => { g.active = g.id === btn.dataset.gid; });
+          await saveState();
           renderProfile();
+          renderHeader();
         });
       });
+
+      const weekDays = [
+        { key: "Lunes", short: "L" },
+        { key: "Martes", short: "M" },
+        { key: "Miércoles", short: "X" },
+        { key: "Jueves", short: "J" },
+        { key: "Viernes", short: "V" },
+        { key: "Sábado", short: "S" },
+        { key: "Domingo", short: "D" }
+      ];
+
+      const renderDayChips = (containerId, listKey) => {
+        const el = document.getElementById(containerId);
+        el.innerHTML = weekDays.map(d => {
+          const active = (p[listKey] || []).includes(d.key);
+          return `<button type="button" data-day="${d.key}" class="rounded-xl py-2 text-xs font-extrabold transition ${active ? "bg-[#fc4c02] text-white" : "border border-[#e2e8f0] bg-[#f7f7fa] text-slate-600 hover:bg-slate-200/60"}">${d.short}</button>`;
+        }).join("");
+        el.querySelectorAll("button").forEach(b => {
+          b.addEventListener("click", () => {
+            const dayName = b.dataset.day;
+            const arr = p[listKey] || [];
+            if (arr.includes(dayName)) p[listKey] = arr.filter(x => x !== dayName);
+            else arr.push(dayName);
+            p[listKey] = arr;
+            renderDayChips(containerId, listKey);
+          });
+        });
+      };
+
+      renderDayChips("pref-run-days", "runDays");
+      renderDayChips("pref-gym-days", "gymDays");
     }
 
-    document.getElementById("save-profile-btn").addEventListener("click", async () => {
-      const zVt1 = document.getElementById("z-vt1").value.trim() || "141-148";
-      const zZ2 = document.getElementById("z-z2").value.trim() || "148-155";
-      const zTempo = document.getElementById("z-tempo").value.trim() || "158-164";
-      const zVt2 = document.getElementById("z-vt2").value.trim() || "165-168";
-      const zVo2 = document.getElementById("z-vo2").value.trim() || "187";
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const rd = new FileReader();
+        rd.onload = () => resolve(String(rd.result).split(",")[1]);
+        rd.onerror = reject;
+        rd.readAsDataURL(file);
+      });
+    }
 
-      const orderedRun = WEEK_DAYS_LIST.map(d => d.full).filter(d => (state.profile.runDays || []).includes(d));
-      const orderedGym = WEEK_DAYS_LIST.map(d => d.full).filter(d => (state.profile.gymDays || []).includes(d));
-
-      state.profile = {
-        ...state.profile,
-        height: Number(document.getElementById("p-height").value || 183),
-        weight: Number(document.getElementById("p-weight").value || 85.1),
-        cadence: Number(document.getElementById("p-cadence").value || 165),
-        zoneVt1: zVt1,
-        zoneZ2: zZ2,
-        zoneTempo: zTempo,
-        zoneVt2: zVt2,
-        zoneVo2: zVo2,
-        zones: `VT1: ${zVt1} | Z2: ${zZ2} | Tempo/MM: ${zTempo} | VT2: ${zVt2} | VO2MAX: ${zVo2}`,
-        runDays: orderedRun,
-        gymDays: orderedGym,
-        days: `Carrera: ${orderedRun.join(", ")} | Gym: ${orderedGym.join(", ")}`,
-        notes: document.getElementById("p-notes").value.trim(),
-        geminiKey: document.getElementById("k-gemini").value.trim(),
-        intervalsId: document.getElementById("k-int-id").value.trim(),
-        intervalsKey: document.getElementById("k-int-key").value.trim()
-      };
-      await persistState();
-      renderProfile();
-      renderProgress();
-      showToast("Ficha y claves guardadas.");
-    });
-
-    document.getElementById("add-goal-btn").addEventListener("click", async () => {
-      const name = document.getElementById("new-goal-name").value.trim();
-      const pace = document.getElementById("new-goal-pace").value.trim();
-      const date = document.getElementById("new-goal-date").value;
-      if (!name || !pace) return;
-      state.goals.forEach(g => { g.active = false; });
-      state.goals.push({ id: `g-${Date.now()}`, name, pace, date, active: true });
-      document.getElementById("new-goal-name").value = "";
-      document.getElementById("new-goal-pace").value = "";
-      document.getElementById("new-goal-form").classList.add("hidden");
-      await persistState();
-      renderProfile();
-    });
-
-    // =========================================================================
-    // EVENTOS GLOBALES, NAVEGACIÓN POR ICONOS Y FIREBASE AUTH
-    // =========================================================================
-    document.getElementById("toggle-week-tools").addEventListener("click", () => {
-      const panel = document.getElementById("week-tools-panel");
-      const arrow = document.getElementById("tools-arrow");
-      panel.classList.toggle("hidden");
-      arrow.textContent = panel.classList.contains("hidden") ? "▾" : "▴";
-    });
-
-    document.getElementById("prev-week").addEventListener("click", async () => {
-      if (state.currentWeekIdx > 0) {
-        state.currentWeekIdx -= 1;
-        document.getElementById("week-select").value = state.currentWeekIdx;
-        await persistState();
-        renderWeek();
+    async function callGemini(promptText, images = []) {
+      const apiKey = state.profile.geminiKey;
+      if (!apiKey) {
+        showToast("Añade primero tu Gemini API Key en Perfil.");
+        return null;
       }
-    });
-
-    document.getElementById("next-week").addEventListener("click", async () => {
-      if (state.currentWeekIdx < TOTAL_WEEKS - 1) {
-        state.currentWeekIdx += 1;
-        document.getElementById("week-select").value = state.currentWeekIdx;
-        await persistState();
-        renderWeek();
+      const parts = [{ text: promptText }];
+      images.forEach(img => parts.push({ inlineData: { mimeType: img.mime, data: img.data } }));
+      try {
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${encodeURIComponent(apiKey)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts }] })
+        });
+        const data = await resp.json();
+        return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      } catch (err) {
+        showToast(`Error consultando Gemini: ${err.message}`);
+        return null;
       }
-    });
+    }
 
-    document.getElementById("week-select").addEventListener("change", async (e) => {
-      state.currentWeekIdx = Number(e.target.value);
-      await persistState();
-      renderWeek();
-    });
-
-    document.getElementById("toggle-pain-btn").addEventListener("click", async () => {
-      const curr = getCurrentWeek();
-      const nextCut = !curr.painCut50;
-      const fresh = buildDeterministicWeek(state.currentWeekIdx, nextCut, false);
-      fresh.sessions = fresh.sessions.map((ns, i) =>
-        curr.sessions[i]?.status === "done" ? curr.sessions[i] : ns
-      );
-      state.weeks[`w_${state.currentWeekIdx}`] = fresh;
-      await persistState();
-      renderWeek();
-    });
-
-    document.getElementById("no-wknd-btn").addEventListener("click", async () => {
-      const curr = getCurrentWeek();
-      const fresh = buildDeterministicWeek(state.currentWeekIdx, curr.painCut50, true);
-      fresh.sessions = fresh.sessions.map((ns, i) =>
-        curr.sessions[i]?.status === "done" ? curr.sessions[i] : ns
-      );
-      state.weeks[`w_${state.currentWeekIdx}`] = fresh;
-      await persistState();
-      renderWeek();
-      showToast("Semana adaptada sin disponibilidad de fin de semana (3 carrera / 2 gym).");
-    });
-
-    let touchStartX = 0;
-    const swipeArea = document.getElementById("swipe-week-area");
-    swipeArea.addEventListener("touchstart", e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
-    swipeArea.addEventListener("touchend", async e => {
-      const diff = e.changedTouches[0].screenX - touchStartX;
-      if (Math.abs(diff) > 60) {
-        const next = Math.max(0, Math.min(TOTAL_WEEKS - 1, state.currentWeekIdx + (diff < 0 ? 1 : -1)));
-        if (next !== state.currentWeekIdx) {
-          state.currentWeekIdx = next;
-          document.getElementById("week-select").value = next;
-          await persistState();
-          renderWeek();
-        }
-      }
-    }, { passive: true });
-
-    const navItems = ["semana", "progreso", "consultor", "perfil"];
+    // Navegación entre las 4 pestañas con iconos SVG
+    const TABS = ["semana", "progreso", "consultor", "perfil"];
     function activateTab(tabName) {
-      navItems.forEach(t => {
+      TABS.forEach(t => {
         document.getElementById(`tab-${t}`).classList.toggle("hidden", t !== tabName);
-        const btn = document.getElementById(`nav-${t}`);
+        const navBtn = document.getElementById(`nav-${t}`);
         if (t === tabName) {
-          btn.classList.add("border-[#fc4c02]", "text-[#fc4c02]");
-          btn.classList.remove("border-transparent", "text-slate-400");
+          navBtn.classList.remove("border-transparent", "text-slate-400");
+          navBtn.classList.add("border-[#fc4c02]", "text-[#fc4c02]");
         } else {
-          btn.classList.remove("border-[#fc4c02]", "text-[#fc4c02]");
-          btn.classList.add("border-transparent", "text-slate-400");
+          navBtn.classList.remove("border-[#fc4c02]", "text-[#fc4c02]");
+          navBtn.classList.add("border-transparent", "text-slate-400");
         }
       });
     }
-    navItems.forEach(t => {
-      document.getElementById(`nav-${t}`).addEventListener("click", () => activateTab(t));
-    });
 
-    document.getElementById("goto-api-key-btn").addEventListener("click", () => {
-      activateTab("perfil");
-      document.getElementById("keys-panel").classList.remove("hidden");
-    });
+    TABS.forEach(t => document.getElementById(`nav-${t}`).addEventListener("click", () => activateTab(t)));
 
+    // Subpestañas Consultor / Comidas
     document.getElementById("sub-consultor-btn").addEventListener("click", () => {
       document.getElementById("sub-consultor-view").classList.remove("hidden");
       document.getElementById("sub-comidas-view").classList.add("hidden");
@@ -1801,21 +1468,274 @@
     });
 
     document.getElementById("sub-comidas-btn").addEventListener("click", () => {
-      document.getElementById("sub-consultor-view").classList.add("hidden");
       document.getElementById("sub-comidas-view").classList.remove("hidden");
+      document.getElementById("sub-consultor-view").classList.add("hidden");
       document.getElementById("sub-comidas-btn").className = "rounded-xl bg-[#fc4c02] py-2 text-xs font-extrabold text-white shadow-2xs";
       document.getElementById("sub-consultor-btn").className = "rounded-xl bg-transparent py-2 text-xs font-bold text-slate-500 hover:text-slate-800";
       renderMealsView();
     });
 
+    // Semana navegación y herramientas
+    document.getElementById("prev-week").addEventListener("click", () => {
+      state.currentWeekIdx = Math.max(0, state.currentWeekIdx - 1);
+      saveState();
+      renderWeek();
+    });
+    document.getElementById("next-week").addEventListener("click", () => {
+      state.currentWeekIdx = Math.min(state.weeks.length - 1, state.currentWeekIdx + 1);
+      saveState();
+      renderWeek();
+    });
+    document.getElementById("week-select").addEventListener("change", (e) => {
+      state.currentWeekIdx = Number(e.target.value);
+      saveState();
+      renderWeek();
+    });
+
+    // Swipe horizontal en Semana
+    let weekTouchX = 0;
+    const weekSwipe = document.getElementById("swipe-week-area");
+    weekSwipe.addEventListener("touchstart", e => { weekTouchX = e.changedTouches[0].screenX; }, { passive: true });
+    weekSwipe.addEventListener("touchend", e => {
+      const dx = e.changedTouches[0].screenX - weekTouchX;
+      if (Math.abs(dx) > 55) {
+        state.currentWeekIdx = dx < 0 ? Math.min(state.weeks.length - 1, state.currentWeekIdx + 1) : Math.max(0, state.currentWeekIdx - 1);
+        saveState();
+        renderWeek();
+      }
+    }, { passive: true });
+
+    // Swipe horizontal y selector en Comidas
+    document.getElementById("meals-prev-week").addEventListener("click", () => {
+      state.mealsWeekIdx = Math.max(0, state.mealsWeekIdx - 1);
+      saveState();
+      renderMealsView();
+    });
+    document.getElementById("meals-next-week").addEventListener("click", () => {
+      state.mealsWeekIdx = Math.min(state.weeks.length - 1, state.mealsWeekIdx + 1);
+      saveState();
+      renderMealsView();
+    });
+    document.getElementById("meals-week-select").addEventListener("change", (e) => {
+      state.mealsWeekIdx = Number(e.target.value);
+      saveState();
+      renderMealsView();
+    });
+
+    let mealsTouchX = 0;
+    const mealsSwipe = document.getElementById("meals-swipe-area");
+    mealsSwipe.addEventListener("touchstart", e => { mealsTouchX = e.changedTouches[0].screenX; }, { passive: true });
+    mealsSwipe.addEventListener("touchend", e => {
+      const dx = e.changedTouches[0].screenX - mealsTouchX;
+      if (Math.abs(dx) > 50) {
+        state.mealsWeekIdx = dx < 0 ? Math.min(state.weeks.length - 1, state.mealsWeekIdx + 1) : Math.max(0, state.mealsWeekIdx - 1);
+        saveState();
+        renderMealsView();
+      }
+    }, { passive: true });
+
+    document.getElementById("toggle-week-tools").addEventListener("click", () => {
+      document.getElementById("week-tools-panel").classList.toggle("hidden");
+    });
+
+    document.getElementById("toggle-pain-btn").addEventListener("click", async () => {
+      const w = state.weeks[state.currentWeekIdx];
+      applyPainCutToWeek(w, !w.painCut50);
+      await saveState();
+      renderWeek();
+    });
+
+    document.getElementById("no-wknd-btn").addEventListener("click", async () => {
+      const w = state.weeks[state.currentWeekIdx];
+      w.sessions.forEach(s => {
+        if (s.status === "done") return;
+        if (s.day === "Sábado" || s.day === "Domingo") {
+          s.status = "off";
+          s.duration_min = 0;
+          s.title = "Descanso (Sin disponibilidad fin de semana)";
+        } else if (s.day === "Viernes" && !isRunType(s.type)) {
+          s.type = "Run_Easy";
+          s.title = "Rodaje Base Z2";
+          s.duration_min = 50;
+          s.base_duration_min = 50;
+          s.target_hr = state.profile.zones.z2;
+          s.status = "pending";
+        }
+      });
+      await saveState();
+      renderWeek();
+      showToast("Semana ajustada a 3 días carrera / 2 gimnasio.");
+    });
+
+    document.getElementById("sync-intervals-btn").addEventListener("click", async () => {
+      const id = state.profile.intervalsId;
+      const key = state.profile.intervalsKey;
+      if (!id || !key) {
+        showToast("Configura Intervals Athlete ID y API Key en Perfil.");
+        return;
+      }
+      try {
+        const res = await fetch(`https://intervals.icu/api/v1/athlete/${encodeURIComponent(id)}/activities?oldest=2026-11-16`, {
+          headers: { Authorization: "Basic " + btoa(`API_KEY:${key}`) }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const acts = await res.json();
+        showToast(`Intervals.icu sincronizado (${acts.length} actividades).`);
+      } catch {
+        showToast("Intervals.icu bloqueó la petición directa desde el navegador; usa la captura Garmin.");
+      }
+    });
+
+    document.getElementById("ai-adapt-run").addEventListener("click", async () => {
+      const txt = document.getElementById("ai-adapt-input").value.trim();
+      if (!txt) return;
+      const w = state.weeks[state.currentWeekIdx];
+      const prompt = `Eres entrenador directo, sin peloteo. Plan actual: ${JSON.stringify(w.sessions)}.
+      Petición: "${txt}".
+      Reglas: nunca tocar sesiones con status="done"; prioridad mecánica -50% en carrera si hay dolor en cintilla/articulación; tirada larga en sábado salvo petición; pierna nunca antes de tirada larga.
+      Devuelve SOLO JSON válido sin markdown:
+      {"summary":"resumen corto","painCut50":false,"sessions":[...array completo de sesiones...]}`;
+      const raw = await callGemini(prompt);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+        const propBox = document.getElementById("ai-adapt-proposal");
+        propBox.innerHTML = `<div class="rounded-xl border border-[#e2e8f0] bg-white p-2.5 space-y-2">
+          <div class="text-xs font-semibold text-slate-800">${parsed.summary}</div>
+          <button id="apply-adapt-btn" class="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white">Aplicar cambio</button>
+        </div>`;
+        document.getElementById("apply-adapt-btn").addEventListener("click", async () => {
+          w.sessions = parsed.sessions.map((ns, i) => w.sessions[i]?.status === "done" ? w.sessions[i] : ns);
+          applyPainCutToWeek(w, Boolean(parsed.painCut50));
+          propBox.innerHTML = "";
+          document.getElementById("ai-adapt-input").value = "";
+          await saveState();
+          renderWeek();
+          showToast("Semana actualizada.");
+        });
+      } catch {
+        showToast("No se pudo interpretar el ajuste propuesto.");
+      }
+    });
+
+    // Progreso peso
+    document.getElementById("toggle-pace-chart").addEventListener("click", () => {
+      document.getElementById("pace-chart-wrap").classList.toggle("hidden");
+    });
+
+    document.getElementById("add-weight-btn").addEventListener("click", async () => {
+      const val = parseFloat(document.getElementById("new-weight-val").value);
+      if (Number.isNaN(val) || val <= 0) return;
+      const note = document.getElementById("new-weight-note").value.trim();
+      const today = new Date().toISOString().slice(0, 10);
+      state.weightLogs.push({ date: today, weight: val, note });
+      state.profile.weight = val;
+      document.getElementById("new-weight-val").value = "";
+      document.getElementById("new-weight-note").value = "";
+      await saveState();
+      renderHeader();
+      renderProgress();
+      showToast("Peso registrado.");
+    });
+
+    // Consultor IA y Comidas
+    document.getElementById("goto-api-key-btn").addEventListener("click", () => {
+      activateTab("perfil");
+      document.getElementById("keys-panel").classList.remove("hidden");
+    });
+
+    document.getElementById("chat-send-btn").addEventListener("click", async () => {
+      const q = document.getElementById("chat-input").value.trim();
+      if (!q) return;
+      document.getElementById("chat-input").value = "";
+      const z = state.profile.zones;
+      const prompt = `Eres un entrenador de carrera y fuerza para Jose Couto (183 cm, ${state.profile.weight} kg, objetivo Media Maratón Sub-1h55m / <5:40 min/km, zonas VT1 ${z.vt1}, Z2 ${z.z2}, Tempo ${z.tempo}, VT2 ${z.vt2}, VO2MAX ${z.vo2}, cadencia mínima ${state.profile.cadence || 165} ppm).
+      Reglas: Cero peloteo, respuestas directas, realistas y en lista de viñetas cortas. Si reporta dolor en cintilla o articulación, indica recorte del 50% en volumen de carrera. No recomiendes suplementos sin contexto.
+      Consulta: "${q}"`;
+      const ans = await callGemini(prompt);
+      if (!ans) return;
+      state.chatHistory.unshift({ q, a: ans });
+      renderChatHistory();
+      await saveState();
+    });
+
+    function renderChatHistory() {
+      document.getElementById("chat-history").innerHTML = state.chatHistory.slice(0, 8).map(item => `
+        <div class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-3 space-y-1.5">
+          <div class="text-xs font-extrabold text-slate-900">${item.q}</div>
+          <div class="whitespace-pre-line text-xs text-slate-700">${item.a}</div>
+        </div>
+      `).join("");
+    }
+
+    document.getElementById("gen-meals-btn").addEventListener("click", async () => {
+      const w = state.weeks[state.mealsWeekIdx];
+      const isRaceWeek = w.week === state.weeks.length;
+      const summaryDays = w.sessions.map(s => `${s.day}: ${s.title} (${s.duration_min} min)`).join(" | ");
+      const prompt = `Genera propuesta semanal de comidas genéricas según entrenamientos para corredor de ${state.profile.weight} kg (prioridad pérdida de grasa y rendimiento 21K).
+      Semana ${w.week} (${w.phase}): ${summaryDays}.
+      ${isRaceWeek ? "Es semana de carrera: incluye carga progresiva de hidratos y pauta de geles/hidratación para el día de la prueba." : "Incluye pauta general de comidas y prueba progresiva de geles en tiradas largas cuando corresponda. Sin suplementos innecesarios."}
+      Responde en lista escaneable por día (Lunes a Domingo), tono directo sin rodeos.`;
+      const ans = await callGemini(prompt);
+      if (!ans) return;
+      state.mealsByWeek[state.mealsWeekIdx] = ans;
+      await saveState();
+      renderMealsView();
+    });
+
+    // Perfil eventos
+    document.getElementById("toggle-new-goal").addEventListener("click", () => {
+      document.getElementById("new-goal-form").classList.toggle("hidden");
+    });
+
+    document.getElementById("add-goal-btn").addEventListener("click", async () => {
+      const name = document.getElementById("new-goal-name").value.trim();
+      const pace = document.getElementById("new-goal-pace").value.trim();
+      const date = document.getElementById("new-goal-date").value;
+      if (!name || !pace || !date) return;
+      state.goals.forEach(g => { g.active = false; });
+      state.goals.push({ id: `g-${Date.now()}`, name, pace, targetTime: "", date, active: true });
+      document.getElementById("new-goal-name").value = "";
+      document.getElementById("new-goal-pace").value = "";
+      document.getElementById("new-goal-form").classList.add("hidden");
+      await saveState();
+      renderProfile();
+      renderHeader();
+      showToast("Nuevo objetivo activado.");
+    });
+
+    document.getElementById("toggle-keys-panel").addEventListener("click", () => {
+      document.getElementById("keys-panel").classList.toggle("hidden");
+    });
+
+    document.getElementById("save-profile-btn").addEventListener("click", async () => {
+      state.profile = {
+        ...state.profile,
+        height: Number(document.getElementById("p-height").value || 183),
+        weight: Number(document.getElementById("p-weight").value || 85.1),
+        cadence: Number(document.getElementById("p-cadence").value || 165),
+        zones: {
+          vt1: document.getElementById("z-vt1").value.trim() || "141-148",
+          z2: document.getElementById("z-z2").value.trim() || "148-155",
+          tempo: document.getElementById("z-tempo").value.trim() || "158-164",
+          vt2: document.getElementById("z-vt2").value.trim() || "165-168",
+          vo2: document.getElementById("z-vo2").value.trim() || "187"
+        },
+        notes: document.getElementById("p-notes").value.trim(),
+        geminiKey: document.getElementById("k-gemini").value.trim(),
+        intervalsId: document.getElementById("k-int-id").value.trim(),
+        intervalsKey: document.getElementById("k-int-key").value.trim()
+      };
+      await saveState();
+      renderHeader();
+      renderProgress();
+      showToast("Ficha guardada.");
+    });
+
     async function handleGoogleLogin() {
       if (!auth) return;
       try {
-        const res = await signInWithPopup(auth, new GoogleAuthProvider());
-        if (res.user.email !== ALLOWED_EMAIL) {
-          await signOut(auth);
-          showToast("Cuenta no autorizada. Solo se permite josecoutomendez@gmail.com.");
-        }
+        await signInWithRedirect(auth, new GoogleAuthProvider());
       } catch (e) {
         showToast(`Aviso Firebase Auth: ${e.message}`);
       }
@@ -1828,35 +1748,44 @@
     document.getElementById("firebase-login-btn").addEventListener("click", handleGoogleLogin);
 
     if (auth) {
-      onAuthStateChanged(auth, async (user) => {
-        if (user && user.email === ALLOWED_EMAIL) {
-          firebaseUser = user;
-          document.getElementById("cloud-auth-trigger").textContent = "Nube activa";
-          document.getElementById("cloud-auth-trigger").classList.add("text-emerald-700", "border-emerald-300", "bg-emerald-50");
-          try {
-            const snap = await getDoc(doc(db, "users", user.uid, "app", "state"));
-            if (snap.exists()) {
-              state = { ...state, ...snap.data() };
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-              initWeekSelect();
-              renderProfile();
-              renderProgress();
-              renderWeek();
-            } else {
-              await persistState();
-            }
-          } catch (e) {
-            console.warn("Firestore sync pendiente:", e);
-          }
+      getRedirectResult(auth).then(async (res) => {
+        if (res?.user && res.user.email !== ALLOWED_EMAIL) {
+          await signOut(auth);
+          showToast("Cuenta no autorizada. Solo se permite josecoutomendez@gmail.com.");
         }
+      }).catch((e) => {
+        showToast(`Aviso redirección Auth: ${e.message}`);
+      });
+
+      onAuthStateChanged(auth, async (user) => {
+        if (user && user.email === ALLOWED_EMAIL && db) {
+          try {
+            const snap = await getDoc(doc(db, "athletes", ALLOWED_EMAIL));
+            if (snap.exists() && snap.data()?.payload) {
+              const cloudState = JSON.parse(snap.data().payload);
+              state = { ...createDefaultState(), ...cloudState };
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+              initSelectors();
+              renderWeek();
+              renderProgress();
+              renderMealsView();
+              renderProfile();
+              renderChatHistory();
+            }
+          } catch {}
+        }
+        renderHeader();
       });
     }
 
-    // Inicialización inmediata
-    initWeekSelect();
-    renderProfile();
-    renderProgress();
+    // Arranque inicial
+    initSelectors();
+    renderHeader();
     renderWeek();
+    renderProgress();
+    renderMealsView();
+    renderProfile();
+    renderChatHistory();
   </script>
 </body>
 </html>
