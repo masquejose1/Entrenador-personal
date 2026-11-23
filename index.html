@@ -780,9 +780,17 @@
         if (!raw) return createDefaultState();
         const parsed = JSON.parse(raw);
         const def = createDefaultState();
+        const mergedWeeks = def.weeks.map((dw, idx) => {
+          const savedW = (parsed.weeks || [])[idx];
+          if (!savedW || !Array.isArray(savedW.sessions) || savedW.sessions.length < 7) {
+            return dw;
+          }
+          return { ...dw, ...savedW };
+        });
         return {
           ...def,
           ...parsed,
+          weeks: mergedWeeks,
           profile: { ...def.profile, ...(parsed.profile || {}), geminiKey: parsed.profile?.geminiKey || DEFAULT_API_KEY }
         };
       } catch {
@@ -1329,16 +1337,16 @@
 
       const endpoints = [
         {
+          url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
+        },
+        {
           url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
         },
         {
           url: `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
           headers: { "Content-Type": "application/json" }
-        },
-        {
-          url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
         }
       ];
 
