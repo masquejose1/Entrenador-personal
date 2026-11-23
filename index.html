@@ -300,12 +300,16 @@
           <button id="toggle-keys-panel" class="text-xs font-bold text-slate-500 hover:text-slate-800">▾ Clave de API IA</button>
           <div id="keys-panel" class="mt-2.5 hidden space-y-2.5">
             <div>
-              <div class="flex items-center justify-between">
-                <label class="block text-[11px] font-bold text-slate-500">Gemini API Key (AI Studio / Vertex AI)</label>
-                <span id="api-key-status-badge" class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">Sin verificar</span>
+              <div class="flex items-center justify-between gap-2">
+                <label class="block text-[11px] font-bold text-slate-500">Gemini API Key</label>
+                <div class="flex items-center gap-1.5">
+                  <span id="api-key-preview-badge" class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-700">Sin clave</span>
+                  <span id="api-key-status-badge" class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">Sin verificar</span>
+                </div>
               </div>
               <div class="mt-1 flex gap-2">
-                <input id="k-gemini" type="password" placeholder="Pega aquí tu clave de Google AI Studio" class="min-w-0 flex-1 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs font-mono" />
+                <input id="k-gemini" type="password" placeholder="Pega aquí tu clave (AQ.Ab... o AIza...)" class="min-w-0 flex-1 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs font-mono" />
+                <button type="button" id="toggle-key-vis-btn" class="shrink-0 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200/70">Ver</button>
                 <button type="button" id="test-api-key-btn" class="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-xs font-extrabold text-white hover:bg-slate-800">Probar</button>
               </div>
               <p id="api-key-feedback" class="mt-1.5 text-[11px] text-slate-500"></p>
@@ -1316,6 +1320,17 @@
 
     let lastGeminiErrorDetail = "";
 
+    function updateApiKeyPreviewBadge() {
+      const k = (state.profile.geminiKey || DEFAULT_API_KEY || "").trim();
+      const prevBadge = document.getElementById("api-key-preview-badge");
+      if (!prevBadge) return;
+      if (!k) {
+        prevBadge.textContent = "Sin clave";
+      } else {
+        prevBadge.textContent = `${k.slice(0, 5)}••••• (${k.length} car.)`;
+      }
+    }
+
     async function callGemini(promptText, images = []) {
       const inputEl = document.getElementById("k-gemini");
       const liveKey = inputEl ? inputEl.value.trim() : "";
@@ -1324,6 +1339,8 @@
         persistState();
       }
       const apiKey = (state.profile.geminiKey || DEFAULT_API_KEY).trim();
+      updateApiKeyPreviewBadge();
+
       if (!apiKey) {
         lastGeminiErrorDetail = "No hay clave introducida.";
         showToast("Introduce tu Gemini API Key en Perfil");
@@ -1337,26 +1354,51 @@
         interInputs.push({ type: "image", data: img.data, mime_type: img.mimeType });
       });
 
-      // IMPORTANTE: Enviar la clave únicamente en un sitio (cabecera x-goog-api-key) para evitar HTTP 400 "Multiple authentication credentials received"
-      const endpoints = [
-        {
-          url: "https://generativelanguage.googleapis.com/v1beta/interactions",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: { model: "gemini-3.8-flash", input: interInputs }
-        },
-        {
-          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: { contents: [{ parts: genParts }] }
-        },
-        {
-          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: { contents: [{ parts: genParts }] }
-        }
-      ];
+      const isAqKey = apiKey.startsWith("AQ.");
 
-      let lastError = "";
+      const endpoints = isAqKey
+        ? [
+            {
+              label: "Vertex Express 2.5-flash",
+              url: `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+              headers: { "Content-Type": "application/json" },
+              body: { contents: [{ role: "user", parts: genParts }] }
+            },
+            {
+              label: "Vertex Express 2.5-flash-lite",
+              url: `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,
+              headers: { "Content-Type": "application/json" },
+              body: { contents: [{ role: "user", parts: genParts }] }
+            },
+            {
+              label: "Gemini API 2.5-flash",
+              url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              body: { contents: [{ parts: genParts }] }
+            },
+            {
+              label: "Interactions API 3.8-flash",
+              url: "https://generativelanguage.googleapis.com/v1beta/interactions",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              body: { model: "gemini-3.8-flash", input: interInputs }
+            }
+          ]
+        : [
+            {
+              label: "Gemini API 2.5-flash",
+              url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              body: { contents: [{ parts: genParts }] }
+            },
+            {
+              label: "Interactions API 3.8-flash",
+              url: "https://generativelanguage.googleapis.com/v1beta/interactions",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              body: { model: "gemini-3.8-flash", input: interInputs }
+            }
+          ];
+
+      const errors = [];
 
       for (const ep of endpoints) {
         try {
@@ -1367,7 +1409,8 @@
           });
           const data = await res.json();
           if (!res.ok) {
-            lastError = data?.error?.message || data?.message || `HTTP ${res.status}`;
+            const msg = data?.error?.message || data?.message || `HTTP ${res.status}`;
+            errors.push(`${ep.label}: ${msg}`);
             continue;
           }
 
@@ -1389,17 +1432,17 @@
             return text;
           }
         } catch (err) {
-          lastError = err.message;
+          errors.push(`${ep.label}: ${err.message}`);
         }
       }
 
-      lastGeminiErrorDetail = lastError;
+      lastGeminiErrorDetail = errors[0] || "Error de conexión";
       const badge = document.getElementById("api-key-status-badge");
       if (badge) {
         badge.textContent = "Error clave";
         badge.className = "rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700";
       }
-      showToast(`Error IA: ${lastError}`);
+      showToast(`Error IA: ${lastGeminiErrorDetail}`);
       return null;
     }
 
@@ -1655,6 +1698,7 @@ Devuelve SOLO JSON válido sin markdown:
       document.getElementById("z-vo2").value = p.zones?.vo2 || "187";
       document.getElementById("p-notes").value = p.notes || "";
       document.getElementById("k-gemini").value = p.geminiKey || DEFAULT_API_KEY;
+      updateApiKeyPreviewBadge();
 
       const renderDayChips = (containerId, selectedList, stateField) => {
         const box = document.getElementById(containerId);
@@ -1682,12 +1726,24 @@ Devuelve SOLO JSON válido sin markdown:
     }
 
     // Navegación semanal y gesto horizontal (swipe) en Semana y Comidas
-    function goWeek(delta) {
+    let weekSwipeLockUntil = 0;
+
+    function goWeek(delta, fromSwipe = false) {
+      if (fromSwipe) {
+        const now = Date.now();
+        if (now < weekSwipeLockUntil) return;
+        weekSwipeLockUntil = now + 450;
+      }
       state.currentWeekIdx = Math.max(0, Math.min(state.weeks.length - 1, state.currentWeekIdx + delta));
       persistState();
       renderWeek();
     }
-    function goMealsWeek(delta) {
+    function goMealsWeek(delta, fromSwipe = false) {
+      if (fromSwipe) {
+        const now = Date.now();
+        if (now < weekSwipeLockUntil) return;
+        weekSwipeLockUntil = now + 450;
+      }
       state.mealsWeekIdx = Math.max(0, Math.min(state.weeks.length - 1, state.mealsWeekIdx + delta));
       persistState();
       renderMealsView();
@@ -1695,14 +1751,16 @@ Devuelve SOLO JSON válido sin markdown:
 
     function attachHorizontalSwipe(elementId, onNext, onPrev) {
       const el = document.getElementById(elementId);
-      if (!el) return;
+      if (!el || el.dataset.swipeBound === "1") return;
+      el.dataset.swipeBound = "1";
+
       let startX = 0;
       let startY = 0;
       let tracking = false;
-      let lastTrigger = 0;
+      let touchActive = false;
 
       const handleStart = (x, y, target) => {
-        if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) {
+        if (target && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)) {
           tracking = false;
           return;
         }
@@ -1714,18 +1772,16 @@ Devuelve SOLO JSON válido sin markdown:
       const handleEnd = (x, y) => {
         if (!tracking) return;
         tracking = false;
-        const now = Date.now();
-        if (now - lastTrigger < 250) return;
         const dx = x - startX;
         const dy = y - startY;
-        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.15) {
-          lastTrigger = now;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.25) {
           if (dx < 0) onNext();
           else onPrev();
         }
       };
 
       el.addEventListener("touchstart", (e) => {
+        touchActive = true;
         const t = e.changedTouches[0];
         handleStart(t.clientX, t.clientY, e.target);
       }, { passive: true });
@@ -1733,14 +1789,17 @@ Devuelve SOLO JSON válido sin markdown:
       el.addEventListener("touchend", (e) => {
         const t = e.changedTouches[0];
         handleEnd(t.clientX, t.clientY);
+        setTimeout(() => { touchActive = false; }, 400);
       }, { passive: true });
 
       el.addEventListener("pointerdown", (e) => {
-        if (e.pointerType === "mouse") handleStart(e.clientX, e.clientY, e.target);
+        if (touchActive || e.pointerType !== "mouse") return;
+        handleStart(e.clientX, e.clientY, e.target);
       });
 
       el.addEventListener("pointerup", (e) => {
-        if (e.pointerType === "mouse") handleEnd(e.clientX, e.clientY);
+        if (touchActive || e.pointerType !== "mouse") return;
+        handleEnd(e.clientX, e.clientY);
       });
     }
 
@@ -1751,7 +1810,7 @@ Devuelve SOLO JSON válido sin markdown:
       persistState();
       renderWeek();
     });
-    attachHorizontalSwipe("tab-semana", () => goWeek(1), () => goWeek(-1));
+    attachHorizontalSwipe("tab-semana", () => goWeek(1, true), () => goWeek(-1, true));
 
     onReady("meals-prev-week", "click", () => goMealsWeek(-1));
     onReady("meals-next-week", "click", () => goMealsWeek(1));
@@ -1760,7 +1819,7 @@ Devuelve SOLO JSON válido sin markdown:
       persistState();
       renderMealsView();
     });
-    attachHorizontalSwipe("meals-swipe-area", () => goMealsWeek(1), () => goMealsWeek(-1));
+    attachHorizontalSwipe("meals-swipe-area", () => goMealsWeek(1, true), () => goMealsWeek(-1, true));
 
     onReady("toggle-week-tools", "click", () => {
       document.getElementById("week-tools-panel")?.classList.toggle("hidden");
@@ -1771,7 +1830,7 @@ Devuelve SOLO JSON válido sin markdown:
       w.painCut50 = !w.painCut50;
       persistState();
       renderWeek();
-      showToast(w.painCut50 ? "Descarga articular -50% activada" : "Volumen normal restaurado");
+      showToast(w.painCut50 ? "Protocolo -50% activado" : "Volumen habitual restaurado");
     });
 
     onReady("no-wknd-btn", "click", () => {
@@ -1953,6 +2012,16 @@ Formato lista escaneable por día, tono directo sin adornos.`;
     onReady("k-gemini", "input", (e) => {
       state.profile.geminiKey = e.target.value.trim();
       persistState();
+      updateApiKeyPreviewBadge();
+    });
+
+    onReady("toggle-key-vis-btn", "click", () => {
+      const inp = document.getElementById("k-gemini");
+      const btn = document.getElementById("toggle-key-vis-btn");
+      if (!inp || !btn) return;
+      const isPass = inp.type === "password";
+      inp.type = isPass ? "text" : "password";
+      btn.textContent = isPass ? "Ocultar" : "Ver";
     });
 
     onReady("test-api-key-btn", "click", async () => {
