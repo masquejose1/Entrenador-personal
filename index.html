@@ -301,11 +301,11 @@
           <div id="keys-panel" class="mt-2.5 hidden space-y-2.5">
             <div>
               <div class="flex items-center justify-between">
-                <label class="block text-[11px] font-bold text-slate-500">Gemini API Key (Google AI Studio · AQ.Ab8...)</label>
+                <label class="block text-[11px] font-bold text-slate-500">Gemini API Key (AI Studio / Vertex AI)</label>
                 <span id="api-key-status-badge" class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">Sin verificar</span>
               </div>
               <div class="mt-1 flex gap-2">
-                <input id="k-gemini" type="text" placeholder="AQ.Ab8..." class="min-w-0 flex-1 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs font-mono" />
+                <input id="k-gemini" type="password" placeholder="Pega aquí tu clave de Google AI Studio" class="min-w-0 flex-1 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs font-mono" />
                 <button type="button" id="test-api-key-btn" class="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-xs font-extrabold text-white hover:bg-slate-800">Probar</button>
               </div>
               <p id="api-key-feedback" class="mt-1.5 text-[11px] text-slate-500"></p>
@@ -1018,14 +1018,9 @@
                         </div>
                         <div class="grid grid-cols-3 gap-1.5">
                           <div>
-              <div class="flex items-center justify-between">
-                <label class="block text-[11px] font-bold text-slate-500">Gemini API Key (Google AI Studio · AQ.Ab8...)</label>
-                <span id="api-key-status-badge" class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">Sin verificar</span>
-              </div>
-              <div class="mt-1 flex gap-2">
-                <input id="k-gemini" type="password" placeholder="Pega aquí tu clave de Google AI Studio" class="min-w-0 flex-1 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs font-mono" />
-                <button type="button" id="test-api-key-btn" class="shrink-0 rounded-xl bg-slate-900 px-3 py-2 text-xs font-extrabold text-white hover:bg-slate-800">Probar</button>
-              </div>
+                            <span class="block text-[10px] font-bold uppercase text-slate-400">Series</span>
+                            <input type="text" value="${ex.sets}" data-gym-field="sets" data-eidx="${eIdx}" class="mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold text-center" />
+                          </div>
                           <div>
                             <span class="block text-[10px] font-bold uppercase text-slate-400">Reps</span>
                             <input type="text" value="${ex.reps}" data-gym-field="reps" data-eidx="${eIdx}" class="mt-0.5 w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold text-center" />
@@ -1311,6 +1306,8 @@
       });
     }
 
+    let lastGeminiErrorDetail = "";
+
     async function callGemini(promptText, images = []) {
       const inputEl = document.getElementById("k-gemini");
       const liveKey = inputEl ? inputEl.value.trim() : "";
@@ -1320,6 +1317,7 @@
       }
       const apiKey = (state.profile.geminiKey || DEFAULT_API_KEY).trim();
       if (!apiKey) {
+        lastGeminiErrorDetail = "No hay clave introducida.";
         showToast("Introduce tu Gemini API Key en Perfil");
         return null;
       }
@@ -1329,14 +1327,28 @@
         parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
       });
 
-      const models = ["gemini-2.5-flash", "gemini-2.0-flash"];
+      const endpoints = [
+        {
+          url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
+        },
+        {
+          url: `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+          headers: { "Content-Type": "application/json" }
+        },
+        {
+          url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
+        }
+      ];
+
       let lastError = "";
 
-      for (const model of models) {
+      for (const ep of endpoints) {
         try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+          const res = await fetch(ep.url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: ep.headers,
             body: JSON.stringify({ contents: [{ parts }] })
           });
           const data = await res.json();
@@ -1344,6 +1356,7 @@
             lastError = data?.error?.message || `HTTP ${res.status}`;
             continue;
           }
+          lastGeminiErrorDetail = "";
           const badge = document.getElementById("api-key-status-badge");
           if (badge) {
             badge.textContent = "Conectada ✓";
@@ -1355,6 +1368,7 @@
         }
       }
 
+      lastGeminiErrorDetail = lastError;
       const badge = document.getElementById("api-key-status-badge");
       if (badge) {
         badge.textContent = "Error clave";
@@ -1925,7 +1939,7 @@ Formato lista escaneable por día, tono directo sin adornos.`;
         if (fb) fb.textContent = "Conexión verificada correctamente con Google Gemini.";
         showToast("Gemini API conectada");
       } else if (fb) {
-        fb.textContent = "No se pudo conectar. Verifica que la clave tenga permisos para Generative Language API en Google Cloud / AI Studio.";
+        fb.textContent = `Detalle del error: ${lastGeminiErrorDetail || "Clave no autorizada para Gemini API"}. Si es una clave rápida de Vertex AI, asegúrate de crearla desde aistudio.google.com/apikey en un proyecto con la Generative Language API habilitada.`;
       }
     });
 
