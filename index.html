@@ -1372,8 +1372,14 @@
           body: { contents: [{ parts: genParts }] }
         },
         {
-          label: "Gemini 2.5 Flash",
-          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          label: "Gemini 3.8 Flash Lite",
+          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite:generateContent",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: { contents: [{ parts: genParts }] }
+        },
+        {
+          label: "Gemini 3.5 Flash",
+          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: { contents: [{ parts: genParts }] }
         },
