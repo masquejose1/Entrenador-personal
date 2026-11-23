@@ -1354,49 +1354,32 @@
         interInputs.push({ type: "image", data: img.data, mime_type: img.mimeType });
       });
 
-      const isAqKey = apiKey.startsWith("AQ.");
-
-      const endpoints = isAqKey
-        ? [
-            {
-              label: "Vertex Express 2.5-flash",
-              url: `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-              headers: { "Content-Type": "application/json" },
-              body: { contents: [{ role: "user", parts: genParts }] }
-            },
-            {
-              label: "Vertex Express 2.5-flash-lite",
-              url: `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`,
-              headers: { "Content-Type": "application/json" },
-              body: { contents: [{ role: "user", parts: genParts }] }
-            },
-            {
-              label: "Gemini API 2.5-flash",
-              url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-              body: { contents: [{ parts: genParts }] }
-            },
-            {
-              label: "Interactions API 3.8-flash",
-              url: "https://generativelanguage.googleapis.com/v1beta/interactions",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-              body: { model: "gemini-3.8-flash", input: interInputs }
-            }
-          ]
-        : [
-            {
-              label: "Gemini API 2.5-flash",
-              url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-              body: { contents: [{ parts: genParts }] }
-            },
-            {
-              label: "Interactions API 3.8-flash",
-              url: "https://generativelanguage.googleapis.com/v1beta/interactions",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-              body: { model: "gemini-3.8-flash", input: interInputs }
-            }
-          ];
+      const endpoints = [
+        {
+          label: "Gemini 3.8 Flash (Native)",
+          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: { contents: [{ parts: genParts }] }
+        },
+        {
+          label: "Gemini 2.5 Flash (Native)",
+          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: { contents: [{ parts: genParts }] }
+        },
+        {
+          label: "Interactions API 3.8 Flash",
+          url: "https://generativelanguage.googleapis.com/v1beta/interactions",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: { model: "gemini-3.8-flash", input: interInputs }
+        },
+        {
+          label: "Vertex Express 3.8 Flash",
+          url: `https://aiplatform.googleapis.com/v1beta1/publishers/google/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+          headers: { "Content-Type": "application/json" },
+          body: { contents: [{ role: "user", parts: genParts }] }
+        }
+      ];
 
       const errors = [];
 
@@ -1436,13 +1419,13 @@
         }
       }
 
-      lastGeminiErrorDetail = errors[0] || "Error de conexión";
+      lastGeminiErrorDetail = errors.join(" | ") || "Error de conexión";
       const badge = document.getElementById("api-key-status-badge");
       if (badge) {
         badge.textContent = "Error clave";
         badge.className = "rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700";
       }
-      showToast(`Error IA: ${lastGeminiErrorDetail}`);
+      showToast(`Error IA: ${errors[0] || "Error de conexión"}`);
       return null;
     }
 
