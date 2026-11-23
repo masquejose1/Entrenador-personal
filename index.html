@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Entrenador C21" />
   <title>Entrenador Personal · Sub-2h 21K</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -19,6 +19,9 @@
       -webkit-tap-highlight-color: transparent;
       padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 16px));
     }
+    .safe-top-header {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
     .safe-bottom-nav {
       padding-bottom: calc(12px + env(safe-area-inset-bottom, 16px));
     }
@@ -26,8 +29,8 @@
 </head>
 <body class="bg-[#f7f7fa] text-slate-900">
 
-  <!-- CABECERA ESTILO STRAVA -->
-  <header class="sticky top-0 z-30 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-xs">
+  <!-- CABECERA ESTILO STRAVA (ACOTADA BAJO BARRA DE ESTADO IPHONE) -->
+  <header class="safe-top-header sticky top-0 z-30 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-xs">
     <div class="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
       <div class="flex items-center gap-2.5 min-w-0">
         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fc4c02] text-white shadow-xs">
@@ -1341,11 +1344,50 @@
       }
     }
 
+    let cachedDiscoveredModels = null;
+
+    async function discoverActiveGeminiModels(apiKey) {
+      if (cachedDiscoveredModels && cachedDiscoveredModels.length > 0) {
+        return cachedDiscoveredModels;
+      }
+      try {
+        const res = await fetchWithTimeout("https://generativelanguage.googleapis.com/v1beta/models?pageSize=50", {
+          method: "GET",
+          headers: { "x-goog-api-key": apiKey }
+        }, 6000);
+        if (!res.ok) return [];
+        const data = await res.json();
+        const models = (data.models || [])
+          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+          .map(m => String(m.name || "").replace(/^models\//, ""))
+          .filter(name => name.includes("gemini") && !name.includes("embedding") && !name.includes("vision") && !name.includes("aqa"));
+
+        models.sort((a, b) => {
+          const score = (n) => {
+            let s = 0;
+            if (n.includes("lite")) s += 30;
+            if (n.includes("flash")) s += 20;
+            if (n.includes("3.8")) s += 15;
+            if (n.includes("3.5") || n.includes("3.0") || n.includes("2.5")) s += 10;
+            if (n.includes("exp") || n.includes("preview") || n.includes("pro")) s -= 10;
+            return s;
+          };
+          return score(b) - score(a);
+        });
+
+        cachedDiscoveredModels = models;
+        return models;
+      } catch {
+        return [];
+      }
+    }
+
     async function callGemini(promptText, images = []) {
       const inputEl = document.getElementById("k-gemini");
       const liveKey = inputEl ? inputEl.value.trim() : "";
       if (liveKey && liveKey !== state.profile.geminiKey) {
         state.profile.geminiKey = liveKey;
+        cachedDiscoveredModels = null;
         persistState();
       }
       const apiKey = (state.profile.geminiKey || DEFAULT_API_KEY).trim();
@@ -1358,86 +1400,67 @@
       }
 
       const genParts = [{ text: promptText }];
-      const interInputs = [{ type: "text", text: promptText }];
       images.forEach(img => {
         genParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
-        interInputs.push({ type: "image", data: img.data, mime_type: img.mimeType });
       });
 
-      const endpoints = [
-        {
-          label: "Gemini 3.8 Flash",
-          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: { contents: [{ parts: genParts }] }
-        },
-        {
-          label: "Gemini 3.8 Flash Lite",
-          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite:generateContent",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: { contents: [{ parts: genParts }] }
-        },
-        {
-          label: "Gemini 3.5 Flash",
-          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: { contents: [{ parts: genParts }] }
-        },
-        {
-          label: "Interactions 3.8 Flash",
-          url: "https://generativelanguage.googleapis.com/v1beta/interactions",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: { model: "gemini-3.8-flash", input: interInputs }
-        }
+      const discovered = await discoverActiveGeminiModels(apiKey);
+      const fallbackList = [
+        "gemini-3.8-flash-lite",
+        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash"
       ];
+      const modelQueue = [...new Set([...discovered, ...fallbackList])].slice(0, 6);
 
       const errors = [];
-      const timeoutMs = images.length > 0 ? 25000 : 8000;
+      const timeoutMs = images.length > 0 ? 25000 : 9000;
 
-      for (const ep of endpoints) {
-        try {
-          const res = await fetchWithTimeout(ep.url, {
-            method: "POST",
-            headers: ep.headers,
-            body: JSON.stringify(ep.body)
-          }, timeoutMs);
-          const data = await res.json();
-          if (!res.ok) {
-            const msg = data?.error?.message || data?.message || `HTTP ${res.status}`;
-            errors.push(`${ep.label}: ${msg}`);
-            continue;
-          }
-
-          let text = "";
-          if (Array.isArray(data?.outputs)) {
-            const txtObj = [...data.outputs].reverse().find(o => o.type === "text" || o.text);
-            text = txtObj?.text || "";
-          } else {
-            text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          }
-
-          if (text) {
-            lastGeminiErrorDetail = "";
-            const badge = document.getElementById("api-key-status-badge");
-            if (badge) {
-              badge.textContent = "Conectada ✓";
-              badge.className = "rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700";
+      for (const modelName of modelQueue) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetchWithTimeout(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              body: JSON.stringify({ contents: [{ parts: genParts }] })
+            }, timeoutMs);
+            const data = await res.json();
+            if (!res.ok) {
+              const msg = data?.error?.message || data?.message || `HTTP ${res.status}`;
+              if ((res.status === 503 || res.status === 429) && attempt === 0) {
+                await new Promise(r => setTimeout(r, 900));
+                continue;
+              }
+              errors.push(`${modelName}: ${msg}`);
+              break;
             }
-            return text;
+
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            if (text) {
+              lastGeminiErrorDetail = "";
+              const badge = document.getElementById("api-key-status-badge");
+              if (badge) {
+                badge.textContent = "Conectada ✓";
+                badge.className = "rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700";
+              }
+              return text;
+            }
+          } catch (err) {
+            const errMsg = err.name === "AbortError" ? "Tiempo agotado" : err.message;
+            errors.push(`${modelName}: ${errMsg}`);
+            break;
           }
-        } catch (err) {
-          const errMsg = err.name === "AbortError" ? "Tiempo agotado (8s)" : err.message;
-          errors.push(`${ep.label}: ${errMsg}`);
         }
       }
 
-      lastGeminiErrorDetail = errors.join(" | ") || "Error de conexión";
+      lastGeminiErrorDetail = errors.slice(0, 3).join(" | ") || "Error de conexión";
       const badge = document.getElementById("api-key-status-badge");
       if (badge) {
         badge.textContent = "Error clave";
         badge.className = "rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700";
       }
-      showToast(`Error IA: ${errors[0] || "Error de conexión"}`);
+      showToast(`Error IA: ${errors[0] || "Servidores saturados"}`);
       return null;
     }
 
