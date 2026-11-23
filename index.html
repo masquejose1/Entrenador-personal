@@ -1331,6 +1331,16 @@
       }
     }
 
+    async function fetchWithTimeout(url, options, timeoutMs = 8000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
     async function callGemini(promptText, images = []) {
       const inputEl = document.getElementById("k-gemini");
       const liveKey = inputEl ? inputEl.value.trim() : "";
@@ -1356,40 +1366,35 @@
 
       const endpoints = [
         {
-          label: "Gemini 3.8 Flash (Native)",
+          label: "Gemini 3.8 Flash",
           url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: { contents: [{ parts: genParts }] }
         },
         {
-          label: "Gemini 2.5 Flash (Native)",
+          label: "Gemini 2.5 Flash",
           url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: { contents: [{ parts: genParts }] }
         },
         {
-          label: "Interactions API 3.8 Flash",
+          label: "Interactions 3.8 Flash",
           url: "https://generativelanguage.googleapis.com/v1beta/interactions",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
           body: { model: "gemini-3.8-flash", input: interInputs }
-        },
-        {
-          label: "Vertex Express 3.8 Flash",
-          url: `https://aiplatform.googleapis.com/v1beta1/publishers/google/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-          headers: { "Content-Type": "application/json" },
-          body: { contents: [{ role: "user", parts: genParts }] }
         }
       ];
 
       const errors = [];
+      const timeoutMs = images.length > 0 ? 25000 : 8000;
 
       for (const ep of endpoints) {
         try {
-          const res = await fetch(ep.url, {
+          const res = await fetchWithTimeout(ep.url, {
             method: "POST",
             headers: ep.headers,
             body: JSON.stringify(ep.body)
-          });
+          }, timeoutMs);
           const data = await res.json();
           if (!res.ok) {
             const msg = data?.error?.message || data?.message || `HTTP ${res.status}`;
@@ -1415,7 +1420,8 @@
             return text;
           }
         } catch (err) {
-          errors.push(`${ep.label}: ${err.message}`);
+          const errMsg = err.name === "AbortError" ? "Tiempo agotado (8s)" : err.message;
+          errors.push(`${ep.label}: ${errMsg}`);
         }
       }
 
