@@ -494,11 +494,12 @@
     function cloneGymTemplate(kind = "legs") {
       if (kind === "legs") {
         return [
-          { name: "Sentadilla copa / Goblet Squat", sets: "3", reps: "10", weight: "20", done: false },
-          { name: "Peso muerto rumano mancuernas", sets: "3", reps: "10", weight: "18", done: false },
-          { name: "Zancada atrás controlada", sets: "3", reps: "8/lado", weight: "12", done: false },
-          { name: "Abducción cadera banda (glúteo medio)", sets: "3", reps: "15", weight: "Banda", done: false },
-          { name: "Elevación talones sóleo", sets: "3", reps: "15", weight: "16", done: false }
+          { name: "1. Wall Sit o Prensa isométrica 60° (Desc. 60s · Tendón rotuliano)", sets: "3", reps: "35-45 seg", weight: "0", done: false },
+          { name: "2. Sentadilla Goblet o Prensa inclinada (Desc. 120s · Bajada 2-3s)", sets: "3", reps: "6-8 reps", weight: "20", done: false },
+          { name: "3. Peso Muerto Rumano mancuernas/barra (Desc. 105s · Cadena posterior)", sets: "3", reps: "8 reps", weight: "18", done: false },
+          { name: "4. Step-Up alto o Zancada atrás (Desc. 90s · Estabilidad unilateral)", sets: "3", reps: "8/pierna", weight: "12", done: false },
+          { name: "5. Elevación de talones de pie + sentado (Desc. 60s · Pausa 2s abajo)", sets: "3", reps: "12 c/u", weight: "16", done: false },
+          { name: "6. Plancha lateral con abducción o Monster Walks goma (Desc. 45s · Glúteo medio)", sets: "3", reps: "12/lado", weight: "Goma", done: false }
         ];
       }
       return [
@@ -508,6 +509,8 @@
         { name: "Plancha frontal + lateral", sets: "3", reps: "40s", weight: "0", done: false }
       ];
     }
+
+    const LEG_SESSION_STRUCTURE = "RIR 2-3 · Calentamiento: 5' bici/elíptica suave + movilidad tobillo/cadera + 2 series aprox.";
 
     function createDefaultWeeks() {
       return [
@@ -534,7 +537,7 @@
           end_date: "2026-11-29",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2026-11-23", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2026-11-23", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2026-11-24", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 50, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2026-11-25", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2026-11-26", type: "Run_Tempo", title: "Calidad: 3x8' Tempo", duration_min: 45, structure: "10' Z2 + 3x8' a 5:20-5:25 (158-164 ppm, rec 2') + 5' Z2", completed: false },
@@ -550,7 +553,7 @@
           end_date: "2026-12-06",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2026-11-30", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2026-11-30", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2026-12-01", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 55, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2026-12-02", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2026-12-03", type: "Run_Intervals", title: "Calidad: 6x3' VT2", duration_min: 45, structure: "10' Z2 + 6x3' a 165-168 ppm (rec 90'') + 8' Z2", completed: false },
@@ -566,7 +569,7 @@
           end_date: "2026-12-13",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2026-12-07", type: "Gym_Legs", title: "Gimnasio: Pierna (Ligero)", duration_min: 40, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2026-12-07", type: "Gym_Legs", title: "Gimnasio: Pierna (Ligero)", duration_min: 40, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2026-12-08", type: "Run_Easy", title: "Rodaje Suave VT1", duration_min: 40, target_hr: "141-148", target_pace: "5:55-6:10", completed: false },
             { day: "Miércoles", date: "2026-12-09", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2026-12-10", type: "Run_Intervals", title: "Calidad: 8x1' Rápido", duration_min: 35, structure: "10' Z2 + 8x1' vivo (rec 1') + 9' Z2", completed: false },
@@ -582,7 +585,7 @@
           end_date: "2026-12-20",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2026-12-14", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2026-12-14", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2026-12-15", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 55, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2026-12-16", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2026-12-17", type: "Run_Intervals", title: "Calidad: 5x5' VT2", duration_min: 50, structure: "10' Z2 + 5x5' a 165-168 ppm (rec 2') + 5' Z2", completed: false },
@@ -598,7 +601,7 @@
           end_date: "2026-12-27",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2026-12-21", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2026-12-21", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2026-12-22", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2026-12-23", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2026-12-24", type: "Run_Tempo", title: "Calidad: 2x15' Ritmo MM", duration_min: 50, structure: "10' Z2 + 2x15' a 5:18-5:25 (158-164 ppm, rec 3') + 7' Z2", completed: false },
@@ -614,7 +617,7 @@
           end_date: "2027-01-03",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2026-12-28", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2026-12-28", type: "Gym_Legs", title: "Gimnasio: Pierna (Fuerza)", duration_min: 50, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2026-12-29", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2026-12-30", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2026-12-31", type: "Run_Tempo", title: "Calidad: 3x12' Tempo", duration_min: 55, structure: "10' Z2 + 3x12' a 5:15-5:22 (158-164 ppm, rec 2') + 5' Z2", completed: false },
@@ -630,7 +633,7 @@
           end_date: "2027-01-10",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2027-01-04", type: "Gym_Legs", title: "Gimnasio: Pierna (Ligero)", duration_min: 40, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2027-01-04", type: "Gym_Legs", title: "Gimnasio: Pierna (Ligero)", duration_min: 40, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2027-01-05", type: "Run_Easy", title: "Rodaje Suave VT1", duration_min: 45, target_hr: "141-148", target_pace: "5:55-6:10", completed: false },
             { day: "Miércoles", date: "2027-01-06", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2027-01-07", type: "Run_Intervals", title: "Calidad: 5x2' Rápido", duration_min: 40, structure: "10' Z2 + 5x2' a 165-168 ppm (rec 90'') + 12' Z2", completed: false },
@@ -646,7 +649,7 @@
           end_date: "2027-01-17",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2027-01-11", type: "Gym_Legs", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2027-01-11", type: "Gym_Legs", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2027-01-12", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2027-01-13", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2027-01-14", type: "Run_Tempo", title: "Específico: 2x18' Ritmo MM", duration_min: 55, structure: "10' Z2 + 2x18' a 5:15-5:22 (rec 3') + 6' Z2", completed: false },
@@ -662,7 +665,7 @@
           end_date: "2027-01-24",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2027-01-18", type: "Gym_Legs", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2027-01-18", type: "Gym_Legs", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2027-01-19", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2027-01-20", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2027-01-21", type: "Run_Intervals", title: "Específico: 4x8' VT2", duration_min: 55, structure: "10' Z2 + 4x8' a 165-168 ppm (rec 2') + 7' Z2", completed: false },
@@ -678,7 +681,7 @@
           end_date: "2027-01-31",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2027-01-25", type: "Gym_Legs", title: "Gimnasio: Pierna (Ligero)", duration_min: 40, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2027-01-25", type: "Gym_Legs", title: "Gimnasio: Pierna (Ligero)", duration_min: 40, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2027-01-26", type: "Run_Easy", title: "Rodaje Suave VT1", duration_min: 45, target_hr: "141-148", target_pace: "5:55-6:10", completed: false },
             { day: "Miércoles", date: "2027-01-27", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2027-01-28", type: "Run_Tempo", title: "Calidad: 3x6' Tempo", duration_min: 40, structure: "10' Z2 + 3x6' a 5:15/km (rec 2') + 8' Z2", completed: false },
@@ -694,7 +697,7 @@
           end_date: "2027-02-07",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2027-02-01", type: "Gym_Legs", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2027-02-01", type: "Gym_Legs", title: "Gimnasio: Pierna (Mantenimiento)", duration_min: 45, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2027-02-02", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 60, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2027-02-03", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2027-02-04", type: "Run_Tempo", title: "Específico: 40' Continuos Ritmo MM", duration_min: 55, structure: "10' Z2 + 40' a 5:18-5:25/km + 5' Z2", completed: false },
@@ -710,7 +713,7 @@
           end_date: "2027-02-14",
           painCut50: false,
           sessions: [
-            { day: "Lunes", date: "2027-02-08", type: "Gym_Legs", title: "Gimnasio: Pierna (Muy suave)", duration_min: 35, completed: false, exercises: cloneGymTemplate("legs") },
+            { day: "Lunes", date: "2027-02-08", type: "Gym_Legs", title: "Gimnasio: Pierna (Muy suave)", duration_min: 35, structure: LEG_SESSION_STRUCTURE, completed: false, exercises: cloneGymTemplate("legs") },
             { day: "Martes", date: "2027-02-09", type: "Run_Easy", title: "Rodaje Base Z2", duration_min: 50, target_hr: "148-155", target_pace: "5:35-5:50", completed: false },
             { day: "Miércoles", date: "2027-02-10", type: "Gym_Upper", title: "Gimnasio: Tren Superior", duration_min: 50, completed: false, exercises: cloneGymTemplate("upper") },
             { day: "Jueves", date: "2027-02-11", type: "Run_Tempo", title: "Activación: 3x8' Ritmo MM", duration_min: 45, structure: "10' Z2 + 3x8' a 5:18/km (rec 2') + 7' Z2", completed: false },
@@ -792,7 +795,20 @@
           if (!savedW || !Array.isArray(savedW.sessions) || savedW.sessions.length < 7) {
             return dw;
           }
-          return { ...dw, ...savedW };
+          const updatedSessions = savedW.sessions.map(s => {
+            if (!s.completed && s.type === "Gym_Legs") {
+              const hasOldDefault = Array.isArray(s.exercises) && s.exercises[0]?.name === "Sentadilla copa / Goblet Squat";
+              if (hasOldDefault || !Array.isArray(s.exercises) || s.exercises.length === 0) {
+                return {
+                  ...s,
+                  structure: s.structure || LEG_SESSION_STRUCTURE,
+                  exercises: cloneGymTemplate("legs")
+                };
+              }
+            }
+            return s;
+          });
+          return { ...dw, ...savedW, sessions: updatedSessions };
         });
         return {
           ...def,
