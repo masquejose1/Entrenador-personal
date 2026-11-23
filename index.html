@@ -1330,23 +1330,29 @@
         return null;
       }
 
-      const parts = [{ text: promptText }];
+      const genParts = [{ text: promptText }];
+      const interInputs = [{ type: "text", text: promptText }];
       images.forEach(img => {
-        parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+        genParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+        interInputs.push({ type: "image", data: img.data, mime_type: img.mimeType });
       });
 
+      // IMPORTANTE: Enviar la clave únicamente en un sitio (cabecera x-goog-api-key) para evitar HTTP 400 "Multiple authentication credentials received"
       const endpoints = [
         {
-          url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
+          url: "https://generativelanguage.googleapis.com/v1beta/interactions",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: { model: "gemini-3.8-flash", input: interInputs }
         },
         {
-          url: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
+          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: { contents: [{ parts: genParts }] }
         },
         {
-          url: `https://aiplatform.googleapis.com/v1/publishers/google/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-          headers: { "Content-Type": "application/json" }
+          url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: { contents: [{ parts: genParts }] }
         }
       ];
 
@@ -1357,20 +1363,31 @@
           const res = await fetch(ep.url, {
             method: "POST",
             headers: ep.headers,
-            body: JSON.stringify({ contents: [{ parts }] })
+            body: JSON.stringify(ep.body)
           });
           const data = await res.json();
           if (!res.ok) {
-            lastError = data?.error?.message || `HTTP ${res.status}`;
+            lastError = data?.error?.message || data?.message || `HTTP ${res.status}`;
             continue;
           }
-          lastGeminiErrorDetail = "";
-          const badge = document.getElementById("api-key-status-badge");
-          if (badge) {
-            badge.textContent = "Conectada ✓";
-            badge.className = "rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700";
+
+          let text = "";
+          if (Array.isArray(data?.outputs)) {
+            const txtObj = [...data.outputs].reverse().find(o => o.type === "text" || o.text);
+            text = txtObj?.text || "";
+          } else {
+            text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
           }
-          return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+          if (text) {
+            lastGeminiErrorDetail = "";
+            const badge = document.getElementById("api-key-status-badge");
+            if (badge) {
+              badge.textContent = "Conectada ✓";
+              badge.className = "rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700";
+            }
+            return text;
+          }
         } catch (err) {
           lastError = err.message;
         }
@@ -1735,7 +1752,6 @@ Devuelve SOLO JSON válido sin markdown:
       renderWeek();
     });
     attachHorizontalSwipe("tab-semana", () => goWeek(1), () => goWeek(-1));
-    attachHorizontalSwipe("days-container", () => goWeek(1), () => goWeek(-1));
 
     onReady("meals-prev-week", "click", () => goMealsWeek(-1));
     onReady("meals-next-week", "click", () => goMealsWeek(1));
@@ -1947,7 +1963,7 @@ Formato lista escaneable por día, tono directo sin adornos.`;
         if (fb) fb.textContent = "Conexión verificada correctamente con Google Gemini.";
         showToast("Gemini API conectada");
       } else if (fb) {
-        fb.textContent = `Detalle del error: ${lastGeminiErrorDetail || "Clave no autorizada para Gemini API"}. Si es una clave rápida de Vertex AI, asegúrate de crearla desde aistudio.google.com/apikey en un proyecto con la Generative Language API habilitada.`;
+        fb.textContent = `Detalle del error: ${lastGeminiErrorDetail || "Clave no autorizada para Gemini API"}.`;
       }
     });
 
