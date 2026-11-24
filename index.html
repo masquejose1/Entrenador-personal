@@ -99,20 +99,9 @@
             </svg>
             Ajustes y adaptación IA
           </button>
-          <span id="pain-status-tag" class="hidden rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-extrabold text-amber-800">Descarga articular -50%</span>
         </div>
 
         <div id="week-tools-panel" class="hidden space-y-3 border-t border-slate-100 pt-3">
-          <div class="flex items-center justify-between rounded-xl bg-[#f7f7fa] p-2.5 border border-slate-100">
-            <div>
-              <div class="text-xs font-extrabold text-slate-800">Protocolo descarga articular (-50% carrera)</div>
-              <div class="text-[11px] text-slate-500">Reduce volumen de carrera al 50% ante molestia en cintilla o rodilla</div>
-            </div>
-            <button id="toggle-pain-btn" role="switch" aria-checked="false" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 transition-colors duration-200">
-              <span id="toggle-pain-knob" class="pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow-xs transition duration-200"></span>
-            </button>
-          </div>
-
           <div class="flex flex-wrap gap-2">
             <button id="no-wknd-btn" class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200/60">
               Sin finde (3 carrera / 2 gym)
@@ -120,9 +109,9 @@
           </div>
 
           <div class="space-y-2">
-            <textarea id="ai-adapt-input" rows="2" placeholder="Ej: Molestia leve en cintilla derecha esta semana / Pasa la tirada larga al domingo / Solo 40 min el jueves..." class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs focus:border-[#fc4c02] focus:outline-hidden"></textarea>
+            <textarea id="ai-adapt-input" rows="2" placeholder="Cuéntame tus sensaciones o disponibilidad (ej: ligera sobrecarga en rodilla, piernas cargadas, pasar tirada al domingo, solo 40 min el jueves...)" class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs focus:border-[#fc4c02] focus:outline-hidden"></textarea>
             <button id="ai-adapt-run" class="rounded-xl bg-[#fc4c02] px-3.5 py-2 text-xs font-extrabold text-white shadow-2xs hover:bg-[#e04300]">
-              Proponer ajuste semanal
+              Adaptar plan según sensaciones (IA)
             </button>
             <div id="ai-adapt-proposal"></div>
           </div>
@@ -183,18 +172,18 @@
         <div class="flex items-center justify-between">
           <div>
             <h3 class="text-sm font-extrabold text-slate-900">Consultor técnico</h3>
-            <p class="text-[11px] text-slate-500">Zonas VT1/Z2/VT2/VO2MAX · Cadencia ≥ 165 ppm · Descarga -50%</p>
+            <p class="text-[11px] text-slate-500">Zonas VT1/Z2/VT2/VO2MAX · Cadencia ≥ 165 ppm · Ajuste por sensaciones</p>
           </div>
           <button id="goto-api-key-btn" class="rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-200/70">API Key</button>
         </div>
 
         <div class="flex flex-wrap gap-1.5">
           <button type="button" data-quick-q="Revisa mi carga de esta semana para 21K Sub-2h y protección de rodilla." class="quick-q-btn rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:border-[#fc4c02]">Revisar semana</button>
-          <button type="button" data-quick-q="Tengo molestia en la cintilla iliotibial, cómo aplico la descarga del 50%?" class="quick-q-btn rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:border-[#fc4c02]">Molestia cintilla</button>
+          <button type="button" data-quick-q="Tengo molestia leve en la cintilla iliotibial, qué ajuste de semana me propones según sensaciones?" class="quick-q-btn rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:border-[#fc4c02]">Molestia cintilla</button>
           <button type="button" data-quick-q="Cómo gestionar Z2 (148-155 ppm) y VT2 (165-168 ppm) sin pasarme?" class="quick-q-btn rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:border-[#fc4c02]">Control de zonas</button>
         </div>
 
-        <textarea id="chat-input" rows="3" placeholder="Consulta dudas de entrenamiento, ritmo, pulsaciones, cadencia o molestias..." class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs focus:border-[#fc4c02] focus:outline-hidden"></textarea>
+        <textarea id="chat-input" rows="3" placeholder="Consulta dudas de entrenamiento, sensaciones, ritmo, pulsaciones, cadencia o molestias..." class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs focus:border-[#fc4c02] focus:outline-hidden"></textarea>
         <button id="chat-send-btn" class="w-full rounded-xl bg-[#fc4c02] py-2.5 text-xs font-extrabold text-white shadow-2xs hover:bg-[#e04300]">Enviar consulta</button>
         <div id="chat-history" class="space-y-2.5 pt-1"></div>
       </div>
@@ -758,9 +747,11 @@
     }
 
     function createDefaultState() {
+      const defaultWeeks = createDefaultWeeks();
+      const realWeekIdx = findCurrentWeekIdxByDate(defaultWeeks);
       return {
-        currentWeekIdx: 0,
-        mealsWeekIdx: 0,
+        currentWeekIdx: realWeekIdx,
+        mealsWeekIdx: realWeekIdx,
         profile: {
           height: 183,
           weight: 85.1,
@@ -780,8 +771,25 @@
         paceLogs: [],
         mealsByWeek: {},
         chatHistory: [],
-        weeks: createDefaultWeeks()
+        weeks: defaultWeeks
       };
+    }
+
+    function getLocalTodayIso() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function findCurrentWeekIdxByDate(weeks) {
+      if (!Array.isArray(weeks) || weeks.length === 0) return 0;
+      const today = getLocalTodayIso();
+      const exactIdx = weeks.findIndex(w => today >= w.start_date && today <= w.end_date);
+      if (exactIdx !== -1) return exactIdx;
+      if (today < weeks[0].start_date) return 0;
+      return weeks.length - 1;
     }
 
     function loadState() {
@@ -810,9 +818,12 @@
           });
           return { ...dw, ...savedW, sessions: updatedSessions };
         });
+        const realWeekIdx = findCurrentWeekIdxByDate(mergedWeeks);
         return {
           ...def,
           ...parsed,
+          currentWeekIdx: realWeekIdx,
+          mealsWeekIdx: realWeekIdx,
           weeks: mergedWeeks,
           profile: { ...def.profile, ...(parsed.profile || {}), geminiKey: parsed.profile?.geminiKey || DEFAULT_API_KEY }
         };
@@ -900,15 +911,14 @@
 
       const activeSessions = week.sessions.filter(s => s.type !== "Rest" && s.type !== "OFF");
       const doneSessions = activeSessions.filter(s => Boolean(s.completed));
-      const mult = week.painCut50 ? 0.5 : 1;
 
       const totalRunMin = week.sessions
         .filter(s => s.type && (s.type.startsWith("Run") || s.type === "Race"))
-        .reduce((acc, s) => acc + Math.round((s.duration_min || 0) * mult), 0);
+        .reduce((acc, s) => acc + (s.duration_min || 0), 0);
 
       const doneRunMin = week.sessions
         .filter(s => s.type && (s.type.startsWith("Run") || s.type === "Race") && s.completed)
-        .reduce((acc, s) => acc + Math.round((s.duration_min || 0) * mult), 0);
+        .reduce((acc, s) => acc + (s.duration_min || 0), 0);
 
       const totalGymMin = week.sessions
         .filter(s => s.type && (s.type.startsWith("Gym") || s.type === "Mobility"))
@@ -923,32 +933,16 @@
       const gymLblEl = document.getElementById("week-gym-progress-label");
       const z2El = document.getElementById("week-z2-pill");
       const barEl = document.getElementById("week-progress-bar");
-      const painTag = document.getElementById("pain-status-tag");
 
       if (sumEl) sumEl.textContent = `${doneSessions.length}/${activeSessions.length} sesiones`;
       if (runLblEl) runLblEl.textContent = `${doneRunMin} / ${totalRunMin} min`;
       if (gymLblEl) gymLblEl.textContent = `${doneGymMin} / ${totalGymMin} min`;
       if (z2El) z2El.textContent = `${state.profile.zones?.z2 || "148-155"} ppm`;
-      if (painTag) painTag.classList.toggle("hidden", !week.painCut50);
 
       const pct = totalRunMin > 0
         ? Math.min(100, Math.round((doneRunMin / totalRunMin) * 100))
         : (activeSessions.length > 0 ? Math.round((doneSessions.length / activeSessions.length) * 100) : 0);
       if (barEl) barEl.style.width = `${pct}%`;
-
-      const painSwitch = document.getElementById("toggle-pain-btn");
-      const painKnob = document.getElementById("toggle-pain-knob");
-      if (painSwitch && painKnob) {
-        if (week.painCut50) {
-          painSwitch.setAttribute("aria-checked", "true");
-          painSwitch.className = "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-[#fc4c02] transition-colors duration-200";
-          painKnob.className = "pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow-xs transition duration-200";
-        } else {
-          painSwitch.setAttribute("aria-checked", "false");
-          painSwitch.className = "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 transition-colors duration-200";
-          painKnob.className = "pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow-xs transition duration-200";
-        }
-      }
 
       const container = document.getElementById("days-container");
       if (!container) return;
@@ -958,7 +952,7 @@
         const isGym = s.type && (s.type.startsWith("Gym") || s.type === "Mobility");
         const isDone = Boolean(s.completed);
         const isFailed = Boolean(s.failed);
-        const effMin = isGym ? (s.duration_min || 0) : Math.round((s.duration_min || 0) * mult);
+        const effMin = s.duration_min || 0;
 
         const cardBg = isDone
           ? "border-emerald-300 bg-emerald-50/75"
@@ -1721,10 +1715,9 @@ Devuelve SOLO un objeto JSON válido con estas claves exactas:
       const mSel = document.getElementById("meals-week-select");
       if (mSel) mSel.value = state.mealsWeekIdx;
       const w = state.weeks[state.mealsWeekIdx];
-      const mult = w.painCut50 ? 0.5 : 1;
       const runMin = w.sessions
         .filter(s => s.type && s.type.startsWith("Run"))
-        .reduce((acc, s) => acc + Math.round((s.duration_min || 0) * mult), 0);
+        .reduce((acc, s) => acc + (s.duration_min || 0), 0);
 
       const refEl = document.getElementById("meals-week-ref");
       if (refEl) refEl.textContent = `${w.phase} · ${runMin} min carrera`;
@@ -1901,14 +1894,6 @@ Devuelve SOLO un objeto JSON válido con estas claves exactas:
       document.getElementById("week-tools-panel")?.classList.toggle("hidden");
     });
 
-    onReady("toggle-pain-btn", "click", () => {
-      const w = state.weeks[state.currentWeekIdx];
-      w.painCut50 = !w.painCut50;
-      persistState();
-      renderWeek();
-      showToast(w.painCut50 ? "Protocolo -50% activado" : "Volumen habitual restaurado");
-    });
-
     onReady("no-wknd-btn", "click", () => {
       const w = state.weeks[state.currentWeekIdx];
       const sat = w.sessions.find(s => s.day === "Sábado");
@@ -1933,31 +1918,37 @@ Devuelve SOLO un objeto JSON válido con estas claves exactas:
       const req = document.getElementById("ai-adapt-input")?.value.trim();
       if (!req) return;
       const w = state.weeks[state.currentWeekIdx];
-      showToast("Calculando propuesta de ajuste...");
-      const prompt = `Eres un entrenador de running directo, sin peloteo. Plan actual Semana ${w.week}: ${JSON.stringify(w.sessions)}.
-Petición: "${req}".
-Reglas obligatorias: programar por tiempo (min); tirada larga en sábado salvo petición; gym pierna nunca antes de tirada larga; si reporta molestia en cintilla o articulación, activar painCut50=true (-50% volumen carrera); respetar sesiones ya con completed=true.
-Devuelve SOLO JSON válido sin markdown:
-{"summary":"resumen en 2 viñetas cortas","painCut50":false,"sessions":[...]}`;
-      const raw = await callGemini(prompt);
+      const z = state.profile.zones;
+      showToast("Generando plan adaptado a tus sensaciones...");
+      const prompt = `Eres un entrenador personal de running y fuerza directo, sin peloteo.
+Atleta: 183 cm, ${state.profile.weight} kg, objetivo Media Maratón Sub-2h (5:15-5:25/km), zonas VT1 ${z.vt1}, Z2 ${z.z2}, Tempo ${z.tempo}, VT2 ${z.vt2}, VO2MAX ${z.vo2}, cadencia mín ${state.profile.cadence} ppm. Notas atleta: ${state.profile.notes || "Sin notas"}.
+Plan actual Semana ${w.week} (${w.phase}): ${JSON.stringify(w.sessions)}.
+Sensaciones o petición del atleta: "${req}".
+Instrucciones:
+- Adapta de forma inteligente los entrenamientos pendientes de esta semana según las sensaciones reportadas (fatiga, sobrecarga, molestias en cintilla/rodilla, falta de tiempo o cambio de días), sin recortes mecánicos genéricos.
+- Si hay molestia articular o fatiga alta, ajusta intensidad, sustituye impactos por trabajo aeróbico suave VT1/Z2 o movilidad/fuerza protectora, y evita día de pierna justo antes de tirada larga.
+- Mantén intactas exactamente como están las sesiones que ya tienen "completed": true.
+- Programa por tiempo (duration_min) y define bloques concretos en "structure".
+Devuelve SOLO JSON válido sin markdown con este formato:
+{"summary":"resumen claro en 2-3 viñetas cortas de los cambios según tus sensaciones","sessions":[...]}`;
+      const raw = await callGemini(prompt, [], true);
       if (!raw) return;
       try {
-        const prop = JSON.parse(raw.replace(/```json|```/g, "").trim());
+        const prop = extractJsonSafe(raw);
         const box = document.getElementById("ai-adapt-proposal");
         box.innerHTML = `
           <div class="mt-2 rounded-xl border border-orange-200 bg-orange-50/70 p-3 text-xs space-y-2">
             <div class="font-bold text-slate-800 whitespace-pre-line">${prop.summary}</div>
-            <button id="confirm-ai-week-btn" class="rounded-lg bg-[#fc4c02] px-3 py-1.5 text-xs font-extrabold text-white">Aplicar ajuste</button>
+            <button id="confirm-ai-week-btn" class="rounded-lg bg-[#fc4c02] px-3 py-1.5 text-xs font-extrabold text-white">Aplicar plan adaptado</button>
           </div>
         `;
         document.getElementById("confirm-ai-week-btn")?.addEventListener("click", () => {
-          w.painCut50 = Boolean(prop.painCut50);
           w.sessions = prop.sessions.map((ns, i) => (w.sessions[i]?.completed ? w.sessions[i] : ns));
           box.innerHTML = "";
           document.getElementById("ai-adapt-input").value = "";
           persistState();
           renderWeek();
-          showToast("Plan semanal actualizado");
+          showToast("Plan semanal adaptado según sensaciones");
         });
       } catch {
         showToast("No se pudo interpretar la propuesta de IA");
@@ -1998,7 +1989,7 @@ Devuelve SOLO JSON válido sin markdown:
 
       const prompt = `Actúa como entrenador personal de running y fuerza para Jose (183 cm, ${state.profile.weight} kg, Media Maratón Sub-2h objetivo 5:15-5:25/km, zonas VT1 ${z.vt1}, Z2 ${z.z2}, Tempo ${z.tempo}, VT2 ${z.vt2}, VO2MAX ${z.vo2}, cadencia mín ${state.profile.cadence} ppm).
 Semana actual (${w.week} - ${w.phase}): ${JSON.stringify(w.sessions.map(s => ({ day: s.day, title: s.title, min: s.duration_min, done: s.completed })))}.
-Reglas obligatorias: Cero peloteo, directo y realista. Formato lista de viñetas escaneables. Si reporta molestia articular o en cintilla iliotibial, prescribe reducir un 50% el volumen de carrera y priorizar protección articular. No recomiendes suplementos sin contexto.
+Reglas obligatorias: Cero peloteo, directo y realista. Formato lista de viñetas escaneables. Si el atleta reporta molestias articulares, sobrecarga o fatiga, diseña una adaptación individualizada de sus sesiones según sus sensaciones concretas (ajustando intensidad, zonas VT1/Z2, cadencia o fuerza protectora) en lugar de aplicar recortes genéricos. No recomiendes suplementos sin contexto.
 Consulta: "${q}"`;
 
       const ans = await callGemini(prompt);
