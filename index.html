@@ -548,143 +548,333 @@
         targetHr,
         targetPace,
         structure,
+        gymTemplate,
+        exercises: gymTemplate ? cloneGymTemplate(gymTemplate) : [],
         status,
         failReason: "",
-        exercises: type === "gym" ? cloneGymTemplate(gymTemplate || "upper") : [],
         audit: null
       };
     }
 
-    function createDefaultWeeks() {
-      const planMeta = [
-        { num: 1, range: "16/11 - 22/11", start: "2026-11-16", end: "2026-11-22", phase: "Fase 1 · Base Aeróbica", t1: "4x4' a 165-168 ppm", t1d: 35, r2: "Rodaje Z2 cómodo", r2d: 40, lr: "Tirada Larga Z2", lrd: 65, g1: 50, g2: 45, g3: 35 },
-        { num: 2, range: "23/11 - 29/11", start: "2026-11-23", end: "2026-11-29", phase: "Fase 1 · Base Aeróbica", t1: "5x3' a 165-168 ppm (rec 90'')", t1d: 38, r2: "Rodaje Z2 + 4 progresivos", r2d: 45, lr: "Tirada Larga Z2", lrd: 70, g1: 50, g2: 45, g3: 35 },
-        { num: 3, range: "30/11 - 06/12", start: "2026-11-30", end: "2026-12-06", phase: "Fase 1 · Base Aeróbica", t1: "3x8' Tempo (158-164 ppm, rec 2')", t1d: 42, r2: "Rodaje Z2 estable", r2d: 48, lr: "Tirada Larga Z2", lrd: 75, g1: 50, g2: 45, g3: 35 },
-        { num: 4, range: "07/12 - 13/12", start: "2026-12-07", end: "2026-12-13", phase: "Semana 4 · Descarga Asimilación", t1: "Rodaje VT1-Z2 suelto", t1d: 32, r2: "Rodaje Z2 ligero", r2d: 35, lr: "Tirada Larga suave Z2", lrd: 55, g1: 40, g2: 40, g3: 0 },
-        { num: 5, range: "14/12 - 20/12", start: "2026-12-14", end: "2026-12-20", phase: "Fase 2 · Construcción Aeróbica", t1: "6x3' a 165-168 ppm (rec 90'')", t1d: 44, r2: "Rodaje Z2 + cadencia ≥ 168", r2d: 50, lr: "Tirada Larga Z2", lrd: 80, g1: 50, g2: 45, g3: 35 },
-        { num: 6, range: "21/12 - 27/12", start: "2026-12-21", end: "2026-12-27", phase: "Fase 2 · Construcción Aeróbica", t1: "3x10' a 5:20-5:25 (158-164 ppm)", t1d: 48, r2: "Rodaje Z2 controlado", r2d: 50, lr: "Tirada Larga Z2 (probar 1 gel)", lrd: 85, g1: 50, g2: 45, g3: 35 },
-        { num: 7, range: "28/12 - 03/01", start: "2026-12-28", end: "2027-01-03", phase: "Fase 2 · Semana San Silvestre", t1: "Rodaje regenerativo < VT1", t1d: 35, r2: "San Silvestre 3.9K + calent.", r2d: 50, lr: "Tirada Larga Z2 post-carrera", lrd: 80, g1: 40, g2: 0, g3: 30 },
-        { num: 8, range: "04/01 - 10/01", start: "2027-01-04", end: "2027-01-10", phase: "Semana 8 · Descarga Asimilación", t1: "Rodaje Z2 cómodo", t1d: 35, r2: "Rodaje Z2 + técnica", r2d: 38, lr: "Tirada Larga suave Z2", lrd: 60, g1: 40, g2: 40, g3: 0 },
-        { num: 9, range: "11/01 - 17/01", start: "2027-01-11", end: "2027-01-17", phase: "Fase 3 · Específico Media Maratón", t1: "4x8' a 5:18-5:23 (158-164 ppm)", t1d: 50, r2: "Rodaje Z2 aeróbico", r2d: 52, lr: "Tirada Larga Z2 + 15' Tempo", lrd: 90, g1: 50, g2: 45, g3: 35 },
-        { num: 10, range: "18/01 - 24/01", start: "2027-01-18", end: "2027-01-24", phase: "Fase 3 · Específico Media Maratón", t1: "5x4' VT2 (165-168 ppm, rec 90'')", t1d: 48, r2: "Rodaje Z2 estable", r2d: 52, lr: "Tirada Larga Z2 (2 geles)", lrd: 95, g1: 50, g2: 45, g3: 30 },
-        { num: 11, range: "25/01 - 31/01", start: "2027-01-25", end: "2027-01-31", phase: "Semana 11 · Descarga Asimilación", t1: "Rodaje Z2 ligero", t1d: 36, r2: "Rodaje Z2 + rectas suaves", r2d: 40, lr: "Tirada Larga Z2 descarga", lrd: 65, g1: 40, g2: 40, g3: 0 },
-        { num: 12, range: "01/02 - 07/02", start: "2027-02-01", end: "2027-02-07", phase: "Fase 4 · Pico Específico 21K", t1: "3x12' Ritmo MM (5:15-5:22)", t1d: 54, r2: "Rodaje Z2 aeróbico", r2d: 50, lr: "Tirada Larga clave Z2 + 20' MM", lrd: 100, g1: 45, g2: 40, g3: 30 },
-        { num: 13, range: "08/02 - 14/02", start: "2027-02-08", end: "2027-02-14", phase: "Fase 4 · Consolidación", t1: "2x15' Ritmo MM (5:15-5:20)", t1d: 50, r2: "Rodaje Z2 cómodo", r2d: 45, lr: "Tirada Larga Z2 controlada", lrd: 85, g1: 40, g2: 35, g3: 0 },
-        { num: 14, range: "15/02 - 21/02", start: "2027-02-15", end: "2027-02-21", phase: "Semana 14 · Tapering 1", t1: "3x6' Ritmo MM (5:15-5:20, rec 2')", t1d: 40, r2: "Rodaje Z2 corto", r2d: 35, lr: "Tirada Z2 tapering", lrd: 60, g1: 35, g2: 30, g3: 0 },
-        { num: 15, range: "22/02 - 28/02", start: "2027-02-22", end: "2027-02-28", phase: "Semana 15 · Competición 21.1K", t1: "4x3' activación ritmo MM", t1d: 30, r2: "Trote muy suave + 3 rectas", r2d: 25, lr: "Activación 15' Z2 pre-carrera", lrd: 15, g1: 30, g2: 0, g3: 0 }
+    function createDefaultWeeks(zonesOverride = null) {
+      const activeZones = zonesOverride || state?.profile?.zones || {
+        vt1: "141-148",
+        z2: "148-155",
+        tempo: "158-164",
+        vt2: "165-168",
+        vo2: "187"
+      };
+      const rawJsonPlan = [
+        {
+          "week": 1,
+          "phase": "Adaptación (Semana Cerrada / Excepción Viaje)",
+          "start_date": "2026-11-16",
+          "end_date": "2026-11-22",
+          "total_run_minutes": 65,
+          "sessions": [
+            { "day": "Lunes", "date": "2026-11-16", "type": "Rest", "title": "Descanso", "duration_min": 0 },
+            { "day": "Martes", "date": "2026-11-17", "type": "Run_Intervals", "title": "Series 4x4' (Completado)", "duration_min": 33, "completed": true },
+            { "day": "Miércoles", "date": "2026-11-18", "type": "Run_Easy", "title": "Rodaje Suave (Completado)", "duration_min": 32, "completed": true },
+            { "day": "Jueves", "date": "2026-11-19", "type": "Gym", "title": "Gimnasio (Completado)", "duration_min": 50, "completed": true },
+            { "day": "Viernes", "date": "2026-11-20", "type": "Rest", "title": "Descanso / Viaje Valladolid", "duration_min": 0 },
+            { "day": "Sábado", "date": "2026-11-21", "type": "Rest", "title": "Sin tirada larga (Viaje Valladolid)", "duration_min": 0 },
+            { "day": "Domingo", "date": "2026-11-22", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 2,
+          "phase": "Fase 1: Construcción de Base y Umbral",
+          "start_date": "2026-11-23",
+          "end_date": "2026-11-29",
+          "total_run_minutes": 170,
+          "sessions": [
+            { "day": "Lunes", "date": "2026-11-23", "type": "Gym_Legs", "title": "Gimnasio: Pierna (Fuerza)", "duration_min": 50 },
+            { "day": "Martes", "date": "2026-11-24", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 50, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2026-11-25", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2026-11-26", "type": "Run_Tempo", "title": "Calidad: 3x8' Tempo", "duration_min": 45, "structure": "10' Z2 (incl. 3 progresivos 20'') + 3x8' a 5:20-5:25 (rec 2') + 5' Z2" },
+            { "day": "Viernes", "date": "2026-11-27", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2026-11-28", "type": "Run_Long", "title": "Tirada Larga Z2", "duration_min": 75, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2026-11-29", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 3,
+          "phase": "Fase 1: Construcción de Base y Umbral",
+          "start_date": "2026-11-30",
+          "end_date": "2026-12-06",
+          "total_run_minutes": 185,
+          "sessions": [
+            { "day": "Lunes", "date": "2026-11-30", "type": "Gym_Legs", "title": "Gimnasio: Pierna (Fuerza)", "duration_min": 50 },
+            { "day": "Martes", "date": "2026-12-01", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 55, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2026-12-02", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2026-12-03", "type": "Run_Intervals", "title": "Calidad: 6x3' VT2", "duration_min": 45, "structure": "10' Z2 + 6x3' a 5:00-5:08 (rec 90'') + 8' Z2" },
+            { "day": "Viernes", "date": "2026-12-04", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2026-12-05", "type": "Run_Long", "title": "Tirada Larga Z2", "duration_min": 85, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2026-12-06", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 4,
+          "phase": "Fase 1: Descarga",
+          "start_date": "2026-12-07",
+          "end_date": "2026-12-13",
+          "total_run_minutes": 140,
+          "sessions": [
+            { "day": "Lunes", "date": "2026-12-07", "type": "Gym_Legs_Light", "title": "Gimnasio: Pierna (Ligero)", "duration_min": 40 },
+            { "day": "Martes", "date": "2026-12-08", "type": "Run_Recovery", "title": "Rodaje Suave VT1", "duration_min": 40, "target_hr": "141-148", "target_pace": "5:55-6:10" },
+            { "day": "Miércoles", "date": "2026-12-09", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2026-12-10", "type": "Run_Intervals", "title": "Calidad: 8x1' Rápido", "duration_min": 35, "structure": "10' Z2 + 8x1' a 4:45-4:55 (rec 1') + 9' Z2" },
+            { "day": "Viernes", "date": "2026-12-11", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2026-12-12", "type": "Run_Long", "title": "Tirada Larga Descarga Z2", "duration_min": 65, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2026-12-13", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 5,
+          "phase": "Fase 2: Desarrollo Específico y Ritmo Objetivo",
+          "start_date": "2026-12-14",
+          "end_date": "2026-12-20",
+          "total_run_minutes": 195,
+          "sessions": [
+            { "day": "Lunes", "date": "2026-12-14", "type": "Gym_Legs", "title": "Gimnasio: Pierna (Fuerza)", "duration_min": 50 },
+            { "day": "Martes", "date": "2026-12-15", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 55, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2026-12-16", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2026-12-17", "type": "Run_Intervals", "title": "Calidad: 5x5' VT2", "duration_min": 50, "structure": "10' Z2 + 5x5' a 5:02-5:10 (rec 2') + 5' Z2" },
+            { "day": "Viernes", "date": "2026-12-18", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2026-12-19", "type": "Run_Long", "title": "Tirada Larga Z2", "duration_min": 90, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2026-12-20", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 6,
+          "phase": "Fase 2: Desarrollo Específico y Ritmo Objetivo",
+          "start_date": "2026-12-21",
+          "end_date": "2026-12-27",
+          "total_run_minutes": 205,
+          "sessions": [
+            { "day": "Lunes", "date": "2026-12-21", "type": "Gym_Legs", "title": "Gimnasio: Pierna (Fuerza)", "duration_min": 50 },
+            { "day": "Martes", "date": "2026-12-22", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 60, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2026-12-23", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2026-12-24", "type": "Run_Tempo", "title": "Calidad: 2x15' Ritmo MM", "duration_min": 50, "structure": "10' Z2 + 2x15' a 5:18-5:25 (rec 3') + 7' Z2" },
+            { "day": "Viernes", "date": "2026-12-25", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2026-12-26", "type": "Run_Long", "title": "Tirada Larga Z2", "duration_min": 95, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2026-12-27", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 7,
+          "phase": "Fase 2: Desarrollo Específico y Ritmo Objetivo",
+          "start_date": "2026-12-28",
+          "end_date": "2027-01-03",
+          "total_run_minutes": 215,
+          "sessions": [
+            { "day": "Lunes", "date": "2026-12-28", "type": "Gym_Legs", "title": "Gimnasio: Pierna (Fuerza)", "duration_min": 50 },
+            { "day": "Martes", "date": "2026-12-29", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 60, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2026-12-30", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2026-12-31", "type": "Run_Tempo", "title": "Calidad: 3x12' Tempo", "duration_min": 55, "structure": "10' Z2 + 3x12' a 5:15-5:22 (rec 2') + 5' Z2" },
+            { "day": "Viernes", "date": "2027-01-01", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2027-01-02", "type": "Run_Long_Progression", "title": "Tirada Larga Progresiva", "duration_min": 100, "structure": "85' Z2 + últimos 15' a 5:25 min/km" },
+            { "day": "Domingo", "date": "2027-01-03", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 8,
+          "phase": "Fase 2: Descarga",
+          "start_date": "2027-01-04",
+          "end_date": "2027-01-10",
+          "total_run_minutes": 155,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-01-04", "type": "Gym_Legs_Light", "title": "Gimnasio: Pierna (Ligero)", "duration_min": 40 },
+            { "day": "Martes", "date": "2027-01-05", "type": "Run_Recovery", "title": "Rodaje Suave VT1", "duration_min": 45, "target_hr": "141-148", "target_pace": "5:55-6:10" },
+            { "day": "Miércoles", "date": "2027-01-06", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2027-01-07", "type": "Run_Intervals", "title": "Calidad: 5x2' Rápido", "duration_min": 40, "structure": "10' Z2 + 5x2' a 4:55-5:05 (rec 90'') + 12' Z2" },
+            { "day": "Viernes", "date": "2027-01-08", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2027-01-09", "type": "Run_Long", "title": "Tirada Larga Descarga Z2", "duration_min": 70, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2027-01-10", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 9,
+          "phase": "Fase 3: Pico de Carga y Simulación Real",
+          "start_date": "2027-01-11",
+          "end_date": "2027-01-17",
+          "total_run_minutes": 220,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-01-11", "type": "Gym_Legs_Maint", "title": "Gimnasio: Pierna (Mantenimiento)", "duration_min": 45 },
+            { "day": "Martes", "date": "2027-01-12", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 60, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2027-01-13", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2027-01-14", "type": "Run_Tempo", "title": "Específico: 2x18' Ritmo MM", "duration_min": 55, "structure": "10' Z2 + 2x18' a 5:15-5:22 (rec 3') + 6' Z2" },
+            { "day": "Viernes", "date": "2027-01-15", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2027-01-16", "type": "Run_Long", "title": "Tirada Larga Z2", "duration_min": 105, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2027-01-17", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 10,
+          "phase": "Fase 3: Pico de Carga y Simulación Real",
+          "start_date": "2027-01-18",
+          "end_date": "2027-01-24",
+          "total_run_minutes": 225,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-01-18", "type": "Gym_Legs_Maint", "title": "Gimnasio: Pierna (Mantenimiento)", "duration_min": 45 },
+            { "day": "Martes", "date": "2027-01-19", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 60, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2027-01-20", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2027-01-21", "type": "Run_Intervals", "title": "Específico: 4x8' VT2", "duration_min": 55, "structure": "10' Z2 + 4x8' a 5:05-5:12 (rec 2') + 7' Z2" },
+            { "day": "Viernes", "date": "2027-01-22", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2027-01-23", "type": "Run_Long_Progression", "title": "Tirada Larga Progresiva", "duration_min": 110, "structure": "85' Z2 + últimos 25' a 5:20 min/km" },
+            { "day": "Domingo", "date": "2027-01-24", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 11,
+          "phase": "Fase 3: Descarga",
+          "start_date": "2027-01-25",
+          "end_date": "2027-01-31",
+          "total_run_minutes": 160,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-01-25", "type": "Gym_Legs_Light", "title": "Gimnasio: Pierna (Ligero)", "duration_min": 40 },
+            { "day": "Martes", "date": "2027-01-26", "type": "Run_Recovery", "title": "Rodaje Suave VT1", "duration_min": 45, "target_hr": "141-148", "target_pace": "5:55-6:10" },
+            { "day": "Miércoles", "date": "2027-01-27", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2027-01-28", "type": "Run_Tempo", "title": "Calidad: 3x6' Tempo", "duration_min": 40, "structure": "10' Z2 + 3x6' a 5:15 (rec 2') + 8' Z2" },
+            { "day": "Viernes", "date": "2027-01-29", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2027-01-30", "type": "Run_Long", "title": "Tirada Larga Descarga Z2", "duration_min": 75, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2027-01-31", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 12,
+          "phase": "Fase 3: Pico Máximo de Carga",
+          "start_date": "2027-02-01",
+          "end_date": "2027-02-07",
+          "total_run_minutes": 235,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-02-01", "type": "Gym_Legs_Maint", "title": "Gimnasio: Pierna (Mantenimiento)", "duration_min": 45 },
+            { "day": "Martes", "date": "2027-02-02", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 60, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2027-02-03", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2027-02-04", "type": "Run_Tempo", "title": "Específico: 40' Continuos Ritmo MM", "duration_min": 55, "structure": "10' Z2 + 40' continuos a 5:18-5:25 + 5' Z2" },
+            { "day": "Viernes", "date": "2027-02-05", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2027-02-06", "type": "Run_Long_Progression", "title": "Tirada Larga Pico Progresiva", "duration_min": 120, "structure": "90' Z2 + últimos 30' a 5:20 min/km" },
+            { "day": "Domingo", "date": "2027-02-07", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 13,
+          "phase": "Fase 4: Tapering y Competición",
+          "start_date": "2027-02-08",
+          "end_date": "2027-02-14",
+          "total_run_minutes": 180,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-02-08", "type": "Gym_Legs_VeryLight", "title": "Gimnasio: Pierna (Muy suave)", "duration_min": 35 },
+            { "day": "Martes", "date": "2027-02-09", "type": "Run_Easy", "title": "Rodaje Base Z2", "duration_min": 50, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2027-02-10", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 50 },
+            { "day": "Jueves", "date": "2027-02-11", "type": "Run_Tempo", "title": "Activación: 3x8' Ritmo MM", "duration_min": 45, "structure": "10' Z2 + 3x8' a 5:18 (rec 2') + 7' Z2" },
+            { "day": "Viernes", "date": "2027-02-12", "type": "Gym_Optional", "title": "Gimnasio: Opcional / Core", "duration_min": 40 },
+            { "day": "Sábado", "date": "2027-02-13", "type": "Run_Long", "title": "Tirada Larga Tapering Z2", "duration_min": 85, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2027-02-14", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 14,
+          "phase": "Fase 4: Tapering y Competición",
+          "start_date": "2027-02-15",
+          "end_date": "2027-02-21",
+          "total_run_minutes": 140,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-02-15", "type": "Gym_Core", "title": "Gimnasio: Solo Core (NO PIERNA)", "duration_min": 35 },
+            { "day": "Martes", "date": "2027-02-16", "type": "Run_Easy", "title": "Rodaje Suave Z2", "duration_min": 45, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Miércoles", "date": "2027-02-17", "type": "Gym_Upper", "title": "Gimnasio: Tren Superior", "duration_min": 45 },
+            { "day": "Jueves", "date": "2027-02-18", "type": "Run_Intervals", "title": "Activación: 4x4' Chispa", "duration_min": 35, "structure": "10' Z2 + 4x4' a 5:05 (rec 2') + 5' Z2" },
+            { "day": "Viernes", "date": "2027-02-19", "type": "Rest", "title": "Descanso", "duration_min": 0 },
+            { "day": "Sábado", "date": "2027-02-20", "type": "Run_Long", "title": "Rodaje Largo Suave Z2", "duration_min": 60, "target_hr": "148-155", "target_pace": "5:35-5:50" },
+            { "day": "Domingo", "date": "2027-02-21", "type": "Rest", "title": "Descanso", "duration_min": 0 }
+          ]
+        },
+        {
+          "week": 15,
+          "phase": "Semana de Competición",
+          "start_date": "2027-02-22",
+          "end_date": "2027-02-28",
+          "total_run_minutes": 60,
+          "sessions": [
+            { "day": "Lunes", "date": "2027-02-22", "type": "Mobility", "title": "Movilidad y Core Suave (NO PIERNA)", "duration_min": 30 },
+            { "day": "Martes", "date": "2027-02-23", "type": "Run_Recovery", "title": "Rodaje Activación VT1", "duration_min": 35, "target_hr": "141-148", "target_pace": "5:55-6:10" },
+            { "day": "Miércoles", "date": "2027-02-24", "type": "Gym_Upper_Light", "title": "Gimnasio: Tren Superior Ligero", "duration_min": 35 },
+            { "day": "Jueves", "date": "2027-02-25", "type": "Run_Activation", "title": "Activación Pre-Carrera", "duration_min": 25, "structure": "10' VT1 + 4x1' a 5:15 (rec 1') + 7' VT1" },
+            { "day": "Viernes", "date": "2027-02-26", "type": "Rest", "title": "Descanso Total e Hidratación", "duration_min": 0 },
+            { "day": "Sábado", "date": "2027-02-27", "type": "Rest", "title": "Descanso / Activación Caminata", "duration_min": 0 },
+            { "day": "Domingo", "date": "2027-02-28", "type": "Race", "title": "MEDIA MARATÓN (21,1 km)", "duration_min": 114, "target_pace": "5:15-5:25", "target_time": "1:51:00 - 1:54:00" }
+          ]
+        }
       ];
 
-      return planMeta.map((w) => {
-        const isW1 = w.num === 1;
-        const isRaceWeek = w.num === 15;
+      const formatShortDate = (isoStr) => {
+        if (!isoStr) return "";
+        const [, m, d] = isoStr.split("-");
+        return `${d}/${m}`;
+      };
+
+      const mapJsonSessionType = (rawType, title) => {
+        const t = String(rawType || "").toLowerCase();
+        if (t === "rest") return { category: "off", gymTemplate: null };
+        if (t.startsWith("gym") || t === "mobility") {
+          if (t.includes("legs")) return { category: "gym", gymTemplate: "legs" };
+          if (t.includes("upper")) return { category: "gym", gymTemplate: "upper" };
+          return { category: "gym", gymTemplate: "core" };
+        }
+        return { category: "run", gymTemplate: null };
+      };
+
+      return rawJsonPlan.map((w) => {
+        const rangeStr = `${formatShortDate(w.start_date)} - ${formatShortDate(w.end_date)}`;
+        const days = (w.sessions || []).map((s, idx) => {
+          const mapped = mapJsonSessionType(s.type, s.title);
+          const isRest = mapped.category === "off" || Number(s.duration_min || 0) === 0;
+          const status = s.completed === true ? "done" : "pending";
+          const rawTypeLower = String(s.type || "").toLowerCase();
+          const titleLower = String(s.title || "").toLowerCase();
+          let inferredHr = "";
+          if (rawTypeLower.includes("vt2") || titleLower.includes("vt2")) {
+            inferredHr = `${activeZones.vt2 || "165-168"} ppm`;
+          } else if (rawTypeLower.includes("tempo") || titleLower.includes("tempo") || titleLower.includes("ritmo mm")) {
+            inferredHr = `${activeZones.tempo || "158-164"} ppm`;
+          }
+          const hrTarget = s.target_hr
+            ? (String(s.target_hr).includes("ppm") || String(s.target_hr).includes("bpm") ? String(s.target_hr) : `${s.target_hr} ppm`)
+            : (inferredHr || "-");
+          const paceTarget = s.target_pace || "-";
+          const structureText = s.structure
+            || (s.target_time ? `Objetivo oficial: ${s.target_time} · Ritmo ${paceTarget}/km` : s.title);
+
+          return {
+            dayIndex: idx,
+            dayName: s.day || WEEKDAYS[idx]?.name || `Día ${idx + 1}`,
+            date: s.date || "",
+            off: isRest,
+            sessions: isRest
+              ? []
+              : [
+                  makeSession(
+                    `w${w.week}-d${idx}-s1`,
+                    mapped.category,
+                    s.title,
+                    Number(s.duration_min) || 35,
+                    hrTarget,
+                    paceTarget,
+                    structureText,
+                    mapped.gymTemplate,
+                    status
+                  )
+                ]
+          };
+        });
+
         return {
-          weekNum: w.num,
-          label: `Semana ${w.num} (${w.range})`,
-          startDate: w.start,
-          endDate: w.end,
+          weekNum: w.week,
+          label: `Semana ${w.week} (${rangeStr})`,
+          startDate: w.start_date,
+          endDate: w.end_date,
           phase: w.phase,
-          days: [
-            {
-              dayIndex: 0,
-              dayName: "Lunes",
-              off: false,
-              sessions: [
-                makeSession(
-                  `w${w.num}-d0-s1`,
-                  "gym",
-                  w.num === 7 ? "Fuerza Pierna (Descarga -40%)" : "Fuerza Pierna · RIR 2-3",
-                  w.g1,
-                  "-",
-                  "-",
-                  "5' bici/elíptica + movilidad tobillo/cadera + 6 ejercicios protectores (RIR 2-3)",
-                  "legs",
-                  isW1 ? "done" : "pending"
-                )
-              ]
-            },
-            {
-              dayIndex: 1,
-              dayName: "Martes",
-              off: false,
-              sessions: [
-                makeSession(
-                  `w${w.num}-d1-s1`,
-                  "run",
-                  w.t1,
-                  w.t1d,
-                  w.num % 4 === 0 || w.num === 7 ? "141-155 ppm" : "158-168 ppm",
-                  w.num % 4 === 0 || w.num === 7 ? "5:50-6:15" : "5:05-5:25",
-                  `10' calentamiento Z2 + ${w.t1} + 6' enfriamiento suave`,
-                  null,
-                  isW1 ? "done" : "pending"
-                )
-              ]
-            },
-            {
-              dayIndex: 2,
-              dayName: "Miércoles",
-              off: w.g2 === 0,
-              sessions: w.g2 > 0
-                ? [makeSession(`w${w.num}-d2-s1`, "gym", "Fuerza Torso + Movilidad", w.g2, "-", "-", "Tren superior controlado + movilidad de cadera y tobillo", "upper", isW1 ? "done" : "pending")]
-                : []
-            },
-            {
-              dayIndex: 3,
-              dayName: "Jueves",
-              off: false,
-              sessions: [
-                makeSession(
-                  `w${w.num}-d3-s1`,
-                  "run",
-                  w.r2,
-                  w.r2d,
-                  w.num === 7 ? "168-178 ppm" : "148-155 ppm",
-                  w.num === 7 ? "4:45" : "5:45-6:10",
-                  w.num === 7
-                    ? "25' calentamiento progresivo + 3.9 km San Silvestre a 4:45/km + 10' vuelta calma"
-                    : `12' entrada progresiva + ${Math.max(15, w.r2d - 12)}' rodaje aeróbico en Zona 2 (cadencia ≥ 165 ppm)`,
-                  null,
-                  isW1 ? "done" : "pending"
-                )
-              ]
-            },
-            {
-              dayIndex: 4,
-              dayName: "Viernes",
-              off: w.g3 === 0,
-              sessions: w.g3 > 0
-                ? [makeSession(`w${w.num}-d4-s1`, "gym", "Core + Estabilidad Glúteo", w.g3, "-", "-", "Core anti-rotación + glúteo medio (prevención cintilla iliotibial)", "core", isW1 ? "done" : "pending")]
-                : []
-            },
-            {
-              dayIndex: 5,
-              dayName: "Sábado",
-              off: false,
-              sessions: [
-                makeSession(
-                  `w${w.num}-d5-s1`,
-                  "run",
-                  w.lr,
-                  w.lrd,
-                  "148-155 ppm",
-                  "5:45-6:15",
-                  isRaceWeek
-                    ? "15' trote muy suave en VT1 + 3 progresivos de 60m"
-                    : `15' calentamiento progresivo + ${Math.max(30, w.lrd - 15)}' tirada aeróbica en Zona 2 estricta`,
-                  null,
-                  isW1 ? "done" : "pending"
-                )
-              ]
-            },
-            {
-              dayIndex: 6,
-              dayName: "Domingo",
-              off: !isRaceWeek,
-              sessions: isRaceWeek
-                ? [makeSession("w15-d6-s1", "run", "COMPETICIÓN · Media Maratón 21.1K", 114, "160-168 ppm", "5:15-5:25", "21,1 km objetivo Sub-2h (5:15-5:25/km) · Estrategia progresiva y geles cada 40'")]
-                : []
-            }
-          ]
+          days
         };
       });
     }
@@ -705,7 +895,14 @@
     }
 
     function createInitialState() {
-      const weeks = createDefaultWeeks();
+      const defaultZones = {
+        vt1: "141-148",
+        z2: "148-155",
+        tempo: "158-164",
+        vt2: "165-168",
+        vo2: "187"
+      };
+      const weeks = createDefaultWeeks(defaultZones);
       const currentIdx = detectCurrentWeekIndex(weeks);
       return {
         currentWeekIdx: currentIdx,
@@ -714,13 +911,7 @@
           height: 183,
           weight: 85.1,
           cadenceMin: 165,
-          zones: {
-            vt1: "141-148",
-            z2: "148-155",
-            tempo: "158-164",
-            vt2: "165-168",
-            vo2: "187"
-          },
+          zones: defaultZones,
           prefRunDays: ["M", "J", "S"],
           prefGymDays: ["L", "X", "V"],
           notes: "Preservar salud articular (tendón rotuliano y cintilla iliotibial). Pierna los lunes lejos de tirada larga.",
@@ -753,9 +944,9 @@
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return createInitialState();
-        const parsed = JSON.parse(raw);
         const base = createInitialState();
+        if (!raw) return base;
+        const parsed = JSON.parse(raw);
         const merged = {
           ...base,
           ...parsed,
@@ -764,13 +955,8 @@
             ...(parsed.profile || {}),
             zones: { ...base.profile.zones, ...(parsed.profile?.zones || {}) }
           },
-          weeks: Array.isArray(parsed.weeks) && parsed.weeks.length === 15 ? parsed.weeks : base.weeks
+          weeks: base.weeks
         };
-        merged.weeks.forEach((w, wIdx) => {
-          if (!w || !Array.isArray(w.days) || w.days.length !== 7 || w.days.every(d => !Array.isArray(d.sessions) || d.sessions.length === 0)) {
-            merged.weeks[wIdx] = base.weeks[wIdx];
-          }
-        });
         if (!merged.profile.geminiKey) merged.profile.geminiKey = DEFAULT_API_KEY;
         const detectedIdx = detectCurrentWeekIndex(merged.weeks);
         merged.currentWeekIdx = detectedIdx;
@@ -1516,9 +1702,11 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
 
         if (parsed.nextQualityTitle) {
           for (let w = state.currentWeekIdx; w < state.weeks.length; w++) {
-            const candidate = state.weeks[w].days
-              .flatMap(d => d.sessions)
-              .find(x => x.type === "run" && x.status === "pending" && x.id !== session.id && (x.title.includes("x") || x.title.includes("Tempo") || x.title.includes("VT2")));
+            const thursdaySessions = (state.weeks[w].days[3]?.sessions || []);
+            const candidate = thursdaySessions.find(x => x.type === "run" && x.status === "pending" && x.id !== session.id)
+              || state.weeks[w].days
+                .flatMap(d => d.sessions)
+                .find(x => x.type === "run" && x.status === "pending" && x.id !== session.id && (x.title.includes("x") || x.title.includes("Tempo") || x.title.includes("VT2") || x.title.includes("MM")));
             if (candidate) {
               candidate.title = parsed.nextQualityTitle;
               break;
