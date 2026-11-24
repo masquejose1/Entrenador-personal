@@ -1361,9 +1361,8 @@
         return cachedDiscoveredModels;
       }
       try {
-        const res = await fetchWithTimeout("https://generativelanguage.googleapis.com/v1beta/models", {
-          method: "GET",
-          headers: { "x-goog-api-key": apiKey }
+        const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`, {
+          method: "GET"
         }, 7000);
         if (!res.ok) return [];
         const data = await res.json();
@@ -1430,12 +1429,12 @@
       }
 
       for (const modelName of modelQueue) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
             const res = await fetchWithTimeout(url, {
               method: "POST",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload)
             }, timeoutMs);
             const data = await res.json();
