@@ -475,6 +475,25 @@
       { key: "D", name: "Domingo", idx: 6 }
     ];
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById("toast-box");
+      if (!box) return;
+      box.textContent = msg;
+      box.classList.remove("hidden");
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => box.classList.add("hidden"), 2800);
+    }
+
     function cloneGymTemplate(templateType) {
       if (templateType === "legs") {
         return [
@@ -710,6 +729,7 @@
 
     let state = loadState();
     let activeDetailRef = null;
+    const expandedGymIds = new Set();
 
     function loadState() {
       try {
@@ -720,9 +740,18 @@
         const merged = {
           ...base,
           ...parsed,
-          profile: { ...base.profile, ...(parsed.profile || {}), zones: { ...base.profile.zones, ...(parsed.profile?.zones || {}) } },
+          profile: {
+            ...base.profile,
+            ...(parsed.profile || {}),
+            zones: { ...base.profile.zones, ...(parsed.profile?.zones || {}) }
+          },
           weeks: Array.isArray(parsed.weeks) && parsed.weeks.length === 15 ? parsed.weeks : base.weeks
         };
+        merged.weeks.forEach((w, wIdx) => {
+          if (!Array.isArray(w.days) || w.days.length !== 7) {
+            merged.weeks[wIdx] = base.weeks[wIdx];
+          }
+        });
         if (!merged.profile.geminiKey) merged.profile.geminiKey = DEFAULT_API_KEY;
         const detectedIdx = detectCurrentWeekIndex(merged.weeks);
         merged.currentWeekIdx = detectedIdx;
@@ -736,115 +765,30 @@
     function persistState() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch {}
-    }
-
-    function showToast(msg) {
-      const box = document.getElementById("toast-box");
-      if (!box) return;
-      box.textContent = msg;
-      box.classList.remove("hidden");
-      clearTimeout(box._timer);
-      box._timer = setTimeout(() => box.classList.add("hidden"), 3200);
-    }
-
-    function escapeHtml(str) {
-      return String(str ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-    }
-
-    function extractJsonObject(rawText) {
-      if (!rawText) return null;
-      const cleaned = rawText.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
-      try {
-        return JSON.parse(cleaned);
-      } catch {
-        const first = cleaned.indexOf("{");
-        const last = cleaned.lastIndexOf("}");
-        if (first !== -1 && last > first) {
-          try {
-            return JSON.parse(cleaned.slice(first, last + 1));
-          } catch {}
-        }
+      } catch (e) {
+        console.warn("Error guardando localStorage:", e);
       }
-      return null;
     }
 
-    let lastGeminiErrorDetail = "";
+    // MOTOR DE CONEXIÓN GEMINI IA CON RESPALDO AUTOMÁTICO DE MODELOS Y AUTENTICACIÓN
     let cachedDiscoveredModels = null;
-    let preferredAuthMode = "query";
-
-    function updateApiKeyPreviewBadge() {
-      const k = (state.profile.geminiKey || DEFAULT_API_KEY || "").trim();
-      const prevBadge = document.getElementById("api-key-preview-badge");
-      if (!prevBadge) return;
-      if (!k) {
-        prevBadge.textContent = "Sin clave";
-      } else {
-        const visiblePart = k.slice(0, 6);
-        prevBadge.textContent = k.length > 6 ? `${visiblePart}•••••` : visiblePart;
-      }
-    }
-
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        return await fetch(url, { ...options, signal: controller.signal });
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-
-    function buildGeminiRequest(endpointPath, apiKey, authMode, method = "GET", bodyObj = null) {
-      const base = `https://generativelanguage.googleapis.com/v1beta/${endpointPath}`;
-      const headers = {};
-      if (bodyObj !== null) headers["Content-Type"] = "application/json";
-      let url = base;
-      if (authMode === "header") {
-        headers["x-goog-api-key"] = apiKey;
-      } else {
-        url = `${base}?key=${encodeURIComponent(apiKey)}`;
-      }
-      const options = { method, headers };
-      if (bodyObj !== null) options.body = JSON.stringify(bodyObj);
-      return { url, options };
-    }
 
     async function discoverActiveGeminiModels(apiKey) {
-      if (Array.isArray(cachedDiscoveredModels) && cachedDiscoveredModels.length > 0) {
-        return cachedDiscoveredModels;
-      }
-      const modes = preferredAuthMode === "header" ? ["header", "query"] : ["query", "header"];
-      for (const mode of modes) {
+      if (cachedDiscoveredModels && cachedDiscoveredModels.length) return cachedDiscoveredModels;
+      const endpoints = [
+        { url: `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`, headers: {} },
+        { url: `https://generativelanguage.googleapis.com/v1beta/models`, headers: { "x-goog-api-key": apiKey } }
+      ];
+      for (const ep of endpoints) {
         try {
-          const { url, options } = buildGeminiRequest("models", apiKey, mode, "GET");
-          const res = await fetchWithTimeout(url, options, 7000);
+          const res = await fetch(ep.url, { headers: ep.headers });
           if (!res.ok) continue;
           const data = await res.json();
           const models = (data.models || [])
-            .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
-            .map(m => String(m.name || "").replace(/^models\//, ""))
-            .filter(name => name.includes("gemini") && !name.includes("embedding") && !name.includes("aqa") && !name.includes("imagen") && !name.includes("veo"));
-          models.sort((a, b) => {
-            const score = (n) => {
-              if (n === "gemini-2.5-flash") return 0;
-              if (n === "gemini-2.5-flash-lite") return 1;
-              if (n === "gemini-flash-latest") return 2;
-              if (n === "gemini-flash-lite-latest") return 3;
-              if (n.includes("3-flash")) return 4;
-              if (n.includes("2.5-pro")) return 5;
-              if (n.includes("2.0-flash") && !n.includes("lite")) return 6;
-              if (n.includes("2.0-flash-lite")) return 7;
-              return 8;
-            };
-            return score(a) - score(b);
-          });
-          if (models.length > 0) {
-            preferredAuthMode = mode;
+            .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+            .map(m => m.name.replace(/^models\//, ""))
+            .filter(name => /gemini/i.test(name) && !/embedding|imagen|veo|aqa|tts/i.test(name));
+          if (models.length) {
             cachedDiscoveredModels = models;
             return models;
           }
@@ -853,251 +797,193 @@
       return [];
     }
 
-    async function sendGeminiPayload(apiKey, modelName, payload, timeoutMs) {
-      const modes = preferredAuthMode === "header" ? ["header", "query"] : ["query", "header"];
-      let lastErr = "";
-
-      for (const mode of modes) {
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const { url, options } = buildGeminiRequest(`models/${modelName}:generateContent`, apiKey, mode, "POST", payload);
-            const res = await fetchWithTimeout(url, options, timeoutMs);
-            const data = await res.json().catch(() => ({}));
-
-            if (!res.ok) {
-              const msg = data?.error?.message || data?.message || `HTTP ${res.status}`;
-              const isHighDemand = res.status === 503 || res.status === 429 || /high demand|overloaded|try later|quota|rate/i.test(msg);
-              const isAuthIssue = res.status === 400 || res.status === 401 || res.status === 403 || /api key|permission|unauthenticated|invalid/i.test(msg);
-
-              if (isHighDemand && attempt === 0) {
-                await new Promise(r => setTimeout(r, 500));
-                continue;
-              }
-              lastErr = `${modelName} (${mode}): ${msg}`;
-              if (isAuthIssue) break;
-              return { ok: false, error: lastErr, fatalAuth: false };
-            }
-
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            if (text) {
-              preferredAuthMode = mode;
-              return { ok: true, text };
-            }
-            lastErr = `${modelName}: respuesta vacía`;
-            break;
-          } catch (err) {
-            lastErr = `${modelName}: ${err.name === "AbortError" ? "Tiempo agotado" : err.message}`;
-            break;
-          }
-        }
-      }
-      return { ok: false, error: lastErr };
-    }
-
-    async function callGemini(promptText, images = [], expectJson = false) {
-      const inputEl = document.getElementById("k-gemini");
-      const liveKey = inputEl ? inputEl.value.trim() : "";
-      if (liveKey && liveKey !== state.profile.geminiKey) {
-        state.profile.geminiKey = liveKey;
-        cachedDiscoveredModels = null;
-        persistState();
-      }
-      const apiKey = (state.profile.geminiKey || DEFAULT_API_KEY).trim();
-      updateApiKeyPreviewBadge();
-
-      if (!apiKey) {
-        lastGeminiErrorDetail = "No hay clave introducida.";
-        showToast("Introduce tu Gemini API Key en Perfil");
-        return null;
-      }
-
-      const genParts = [{ text: promptText }];
-      images.forEach(img => {
-        genParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
-      });
+    async function callGemini(promptText, imagesBase64 = [], requireJson = false) {
+      const apiKey = (state.profile.geminiKey || DEFAULT_API_KEY || "").trim();
+      if (!apiKey) throw new Error("Falta la clave de API de Gemini en Perfil.");
 
       const discovered = await discoverActiveGeminiModels(apiKey);
-      const priorityDefaults = [
+      const priorityList = [
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
-        "gemini-2.5-pro",
         "gemini-2.0-flash",
         "gemini-2.0-flash-lite",
+        "gemini-2.5-pro",
         "gemini-pro-latest"
       ];
-      const modelQueue = [...new Set([...discovered, ...priorityDefaults])];
+      const modelQueue = [...new Set([...priorityList, ...discovered])];
 
-      const errors = [];
-      const timeoutMs = images.length > 0 ? 35000 : 12000;
-      const basePayload = { contents: [{ parts: genParts }] };
-      const jsonPayload = expectJson
-        ? {
-            contents: [{ parts: genParts }],
-            generationConfig: { responseMimeType: "application/json", maxOutputTokens: 4096 }
+      const parts = [{ text: promptText }];
+      for (const img of imagesBase64) {
+        parts.push({
+          inlineData: {
+            mimeType: img.mimeType || "image/jpeg",
+            data: img.data
           }
-        : basePayload;
-
-      for (const modelName of modelQueue) {
-        let res = await sendGeminiPayload(apiKey, modelName, jsonPayload, timeoutMs);
-        if (!res.ok && expectJson && /json|mime|supported/i.test(res.error || "")) {
-          res = await sendGeminiPayload(apiKey, modelName, basePayload, timeoutMs);
-        }
-        if (res.ok && res.text) {
-          lastGeminiErrorDetail = "";
-          const badge = document.getElementById("api-key-status-badge");
-          if (badge) {
-            badge.textContent = `Conectada ✓ (${modelName})`;
-            badge.className = "rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700";
-          }
-          return res.text;
-        }
-        if (res.error) errors.push(res.error);
+        });
       }
 
-      lastGeminiErrorDetail = errors.slice(0, 3).join(" | ") || "Error de conexión";
-      const badge = document.getElementById("api-key-status-badge");
-      if (badge) {
-        badge.textContent = "Error clave";
-        badge.className = "rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700";
+      const authModes = [
+        { buildUrl: (m) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`, extraHeaders: {} },
+        { buildUrl: (m) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, extraHeaders: { "x-goog-api-key": apiKey } }
+      ];
+
+      let lastErr = "No se pudo conectar con Gemini.";
+      for (const model of modelQueue) {
+        for (const auth of authModes) {
+          const bodyObj = {
+            contents: [{ role: "user", parts }],
+            generationConfig: { temperature: 0.35 }
+          };
+          if (requireJson) {
+            bodyObj.generationConfig.responseMimeType = "application/json";
+          }
+          try {
+            const res = await fetch(auth.buildUrl(model), {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...auth.extraHeaders },
+              body: JSON.stringify(bodyObj)
+            });
+            const rawText = await res.text();
+            let json = {};
+            try { json = JSON.parse(rawText); } catch {}
+            if (!res.ok) {
+              lastErr = `${model}: ${json?.error?.message || res.statusText}`;
+              continue;
+            }
+            const out = json?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("\n").trim();
+            if (out) {
+              return out;
+            }
+          } catch (err) {
+            lastErr = `${model}: ${err.message}`;
+          }
+        }
       }
-      showToast(`Error IA: ${errors[0] || "Servidores no disponibles"}`);
-      return null;
+      throw new Error(lastErr);
+    }
+
+    function extractJsonFromText(raw) {
+      const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+      try {
+        return JSON.parse(cleaned);
+      } catch {
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        if (start !== -1 && end !== -1 && end > start) {
+          return JSON.parse(cleaned.slice(start, end + 1));
+        }
+        const arrStart = cleaned.indexOf("[");
+        const arrEnd = cleaned.lastIndexOf("]");
+        if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
+          return JSON.parse(cleaned.slice(arrStart, arrEnd + 1));
+        }
+        throw new Error("Respuesta IA sin formato JSON válido.");
+      }
     }
 
     function fileToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-          const res = String(reader.result || "");
-          const commaIdx = res.indexOf(",");
-          resolve({
-            mimeType: file.type || "image/jpeg",
-            data: commaIdx >= 0 ? res.slice(commaIdx + 1) : res
-          });
+          const result = String(reader.result || "");
+          const commaIdx = result.indexOf(",");
+          const base64 = commaIdx !== -1 ? result.slice(commaIdx + 1) : result;
+          resolve({ mimeType: file.type || "image/jpeg", data: base64 });
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
     }
 
-    function openModal({ title, bodyHtml, confirmText = "Aceptar", onConfirm }) {
-      const overlay = document.getElementById("modal-overlay");
-      document.getElementById("modal-title").textContent = title;
-      document.getElementById("modal-body").innerHTML = bodyHtml;
-      const confirmBtn = document.getElementById("modal-confirm");
-      confirmBtn.textContent = confirmText;
-
-      const close = () => overlay.classList.add("hidden");
-      document.getElementById("modal-close").onclick = close;
-      document.getElementById("modal-cancel").onclick = close;
-      confirmBtn.onclick = () => {
-        if (onConfirm) onConfirm();
-        close();
-      };
-      overlay.classList.remove("hidden");
-      overlay.classList.add("flex");
-    }
-
     function renderHeader() {
       const activeGoal = state.goals.find(g => g.active) || state.goals[0];
-      document.getElementById("header-goal").textContent = activeGoal ? activeGoal.name : "Media Maratón Sub-2h";
-      document.getElementById("header-status").textContent = `${String(state.profile.weight).replace(".", ",")} kg · Obj. 1:51:00–1:54:00 · Cadencia ≥ ${state.profile.cadenceMin} ppm`;
-    }
-
-    function switchTab(tabName) {
-      ["semana", "progreso", "consultor", "perfil"].forEach(name => {
-        const sec = document.getElementById(`tab-${name}`);
-        const nav = document.getElementById(`nav-${name}`);
-        const active = name === tabName;
-        if (sec) sec.classList.toggle("hidden", !active);
-        if (nav) {
-          nav.classList.toggle("border-[#fc4c02]", active);
-          nav.classList.toggle("text-[#fc4c02]", active);
-          nav.classList.toggle("border-transparent", !active);
-          nav.classList.toggle("text-slate-400", !active);
-        }
-      });
-      if (tabName === "progreso") renderProgreso();
-      if (tabName === "consultor") renderConsultor();
-      if (tabName === "perfil") renderPerfil();
+      const goalEl = document.getElementById("header-goal");
+      const statusEl = document.getElementById("header-status");
+      const z2El = document.getElementById("week-z2-pill");
+      if (goalEl && activeGoal) goalEl.textContent = activeGoal.name;
+      if (statusEl) {
+        const wStr = String(state.profile.weight).replace(".", ",");
+        statusEl.textContent = `${wStr} kg · Obj. 1:51:00–1:54:00 · Cadencia ≥ ${state.profile.cadenceMin} ppm`;
+      }
+      if (z2El) z2El.textContent = `${state.profile.zones.z2} ppm`;
     }
 
     function renderWeek() {
+      const weekSelect = document.getElementById("week-select");
+      weekSelect.innerHTML = state.weeks.map((w, idx) =>
+        `<option value="${idx}" ${idx === state.currentWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`
+      ).join("");
+
       const week = state.weeks[state.currentWeekIdx];
-      if (!week) return;
-
-      const sel = document.getElementById("week-select");
-      sel.innerHTML = state.weeks.map((w, idx) => `<option value="${idx}" ${idx === state.currentWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`).join("");
-
       document.getElementById("week-phase-badge").textContent = week.phase;
-      document.getElementById("week-z2-pill").textContent = `${state.profile.zones.z2} ppm`;
 
-      let totalSessions = 0;
-      let doneSessions = 0;
-      let runPlan = 0;
-      let runDone = 0;
-      let gymPlan = 0;
-      let gymDone = 0;
+      let totalActive = 0;
+      let totalDone = 0;
+      let runPlanMin = 0;
+      let runDoneMin = 0;
+      let gymPlanMin = 0;
+      let gymDoneMin = 0;
 
       week.days.forEach(d => {
         if (d.off) return;
         d.sessions.forEach(s => {
-          totalSessions++;
+          totalActive++;
           const dur = Number(s.durationMin) || 0;
           if (s.type === "run") {
-            runPlan += dur;
-            if (s.status === "done") runDone += dur;
+            runPlanMin += dur;
+            if (s.status === "done") runDoneMin += dur;
           } else {
-            gymPlan += dur;
-            if (s.status === "done") gymDone += dur;
+            gymPlanMin += dur;
+            if (s.status === "done") gymDoneMin += dur;
           }
-          if (s.status === "done") doneSessions++;
+          if (s.status === "done") totalDone++;
         });
       });
 
-      document.getElementById("week-summary").textContent = `${doneSessions}/${totalSessions} sesiones`;
-      document.getElementById("week-run-progress-label").textContent = `${runDone} / ${runPlan} min`;
-      document.getElementById("week-gym-progress-label").textContent = `${gymDone} / ${gymPlan} min`;
-      const pct = totalSessions > 0 ? Math.round((doneSessions / totalSessions) * 100) : 0;
+      document.getElementById("week-summary").textContent = `${totalDone}/${totalActive} sesiones`;
+      document.getElementById("week-run-progress-label").textContent = `${runDoneMin} / ${runPlanMin} min`;
+      document.getElementById("week-gym-progress-label").textContent = `${gymDoneMin} / ${gymPlanMin} min`;
+      const pct = totalActive > 0 ? Math.round((totalDone / totalActive) * 100) : 0;
       document.getElementById("week-progress-bar").style.width = `${pct}%`;
 
       const container = document.getElementById("days-container");
       container.innerHTML = week.days.map((day, dIdx) => {
         if (day.off || day.sessions.length === 0) {
           return `
-            <div class="rounded-2xl border border-[#e2e8f0] bg-white/80 p-3.5 shadow-2xs flex items-center justify-between gap-2">
-              <div class="flex items-center gap-2.5 min-w-0">
-                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+            <div class="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/70 px-3.5 py-3">
+              <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
                 </div>
-                <div class="min-w-0">
-                  <div class="text-xs font-extrabold text-slate-700">${escapeHtml(day.dayName)} · Descanso / OFF</div>
-                  <div class="text-[11px] text-slate-400">Recuperación activa sin carga programada</div>
+                <div>
+                  <div class="text-xs font-extrabold text-slate-500">${escapeHtml(day.dayName)}</div>
+                  <div class="text-[11px] font-medium text-slate-400">Descanso / OFF</div>
                 </div>
               </div>
-              <button data-day-menu="${dIdx}" class="rounded-lg px-2 py-1 text-sm font-black text-slate-500 hover:bg-slate-100">⋮</button>
+              <button type="button" data-day-menu="${dIdx}" class="rounded-lg px-2 py-1 text-sm font-black text-slate-400 hover:bg-slate-100 hover:text-slate-700">⋮</button>
             </div>
           `;
         }
 
-        const sessionsHtml = day.sessions.map((s, sIdx) => {
+        return day.sessions.map((s, sIdx) => {
+          const isRun = s.type === "run";
           const isDone = s.status === "done";
           const isFailed = s.status === "failed";
-          const isRun = s.type === "run";
           const cardBg = isDone
-            ? "border-emerald-300 bg-emerald-50/75"
+            ? "border-emerald-300 bg-emerald-50/70"
             : isFailed
               ? "border-red-200 bg-red-50/50"
               : "border-[#e2e8f0] bg-white";
 
           const iconSvg = isRun
-            ? `<svg class="h-4 w-4 text-[#fc4c02]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 17h16l-1.5-5.5L14 10l-3-4-4 4-3 2.5z"></path></svg>`
-            : `<svg class="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"></path></svg>`;
+            ? `<svg class="h-4 w-4 text-[#fc4c02]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 16l4.5-4.5L12 14l4-6 4 4v6H4v-2z"></path></svg>`
+            : `<svg class="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3"></path></svg>`;
 
           let gymHtml = "";
           if (!isRun) {
+            const isGymOpen = expandedGymIds.has(s.id);
             const exRows = (s.exercises || []).map((ex, exIdx) => `
               <div class="rounded-xl border border-slate-200/80 bg-white/90 p-2 space-y-1.5">
                 <div class="flex items-center gap-1.5">
@@ -1123,7 +1009,7 @@
             `).join("");
 
             gymHtml = `
-              <div class="mt-2.5 space-y-1.5 border-t border-slate-200/70 pt-2.5">
+              <div class="${isGymOpen ? "" : "hidden"} mt-2.5 space-y-1.5 border-t border-slate-200/70 pt-2.5">
                 ${exRows}
                 <div class="flex items-center justify-between gap-2 pt-1">
                   <button type="button" data-add-ex="${dIdx}:${sIdx}" class="rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50">+ Ejercicio</button>
@@ -1143,18 +1029,23 @@
               </div>`
             : "";
 
+          const gymCountBadge = !isRun
+            ? `<span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">${(s.exercises || []).length} ej. ${expandedGymIds.has(s.id) ? "▴" : "▾"}</span>`
+            : "";
+
           return `
             <div class="rounded-2xl border ${cardBg} p-3.5 shadow-2xs transition-colors">
               <div class="flex items-start justify-between gap-2.5">
-                <div class="flex items-start gap-2.5 min-w-0 flex-1 ${isRun ? "cursor-pointer" : ""}" ${isRun ? `data-open-run="${dIdx}:${sIdx}"` : ""}>
+                <div class="flex items-start gap-2.5 min-w-0 flex-1 cursor-pointer" ${isRun ? `data-open-run="${dIdx}:${sIdx}"` : `data-toggle-gym="${dIdx}:${sIdx}"`}>
                   <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isRun ? "bg-orange-50" : "bg-slate-100"}">
                     ${iconSvg}
                   </div>
                   <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
                       <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">${escapeHtml(day.dayName)}</span>
                       <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-extrabold text-slate-700">${escapeHtml(s.durationMin)} min</span>
                       ${s.targetHr && s.targetHr !== "-" ? `<span class="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-extrabold text-[#fc4c02]">${escapeHtml(s.targetHr)}</span>` : ""}
+                      ${gymCountBadge}
                     </div>
                     <h4 class="mt-0.5 text-xs font-black text-slate-900">${escapeHtml(s.title)}</h4>
                     <p class="mt-0.5 text-[11px] text-slate-500">${escapeHtml(s.structure)}</p>
@@ -1171,8 +1062,6 @@
             </div>
           `;
         }).join("");
-
-        return sessionsHtml;
       }).join("");
 
       bindWeekEvents();
@@ -1187,6 +1076,24 @@
           gymSes.exercises = exercises.map(e => ({ ...e, done: false }));
         }
       }
+    }
+
+    function openModal(title, bodyHtml, onConfirm) {
+      const overlay = document.getElementById("modal-overlay");
+      document.getElementById("modal-title").textContent = title;
+      document.getElementById("modal-body").innerHTML = bodyHtml;
+      overlay.classList.remove("hidden");
+      overlay.classList.add("flex");
+      const close = () => {
+        overlay.classList.add("hidden");
+        overlay.classList.remove("flex");
+      };
+      document.getElementById("modal-close").onclick = close;
+      document.getElementById("modal-cancel").onclick = close;
+      document.getElementById("modal-confirm").onclick = () => {
+        if (onConfirm) onConfirm();
+        close();
+      };
     }
 
     function bindWeekEvents() {
@@ -1209,6 +1116,16 @@
         };
       });
 
+      document.querySelectorAll("[data-toggle-gym]").forEach(el => {
+        el.onclick = () => {
+          const [dIdx, sIdx] = el.dataset.toggleGym.split(":").map(Number);
+          const ses = week.days[dIdx].sessions[sIdx];
+          if (expandedGymIds.has(ses.id)) expandedGymIds.delete(ses.id);
+          else expandedGymIds.add(ses.id);
+          renderWeek();
+        };
+      });
+
       document.querySelectorAll("[data-ex-toggle]").forEach(chk => {
         chk.onchange = () => {
           const [dIdx, sIdx, exIdx] = chk.dataset.exToggle.split(":").map(Number);
@@ -1221,9 +1138,11 @@
         inp.onchange = () => {
           const [dIdx, sIdx, exIdx, field] = inp.dataset.exField.split(":");
           const ses = week.days[Number(dIdx)].sessions[Number(sIdx)];
-          ses.exercises[Number(exIdx)][field] = field === "sets" || field === "weight" ? Number(inp.value) : inp.value;
+          const ex = ses.exercises[Number(exIdx)];
+          ex[field] = (field === "sets" || field === "weight") ? Number(inp.value) : inp.value;
           propagateGymRoutine(state.currentWeekIdx, Number(dIdx), ses.exercises);
           persistState();
+          showToast("Rutina actualizada y propagada");
         };
       });
 
@@ -1242,7 +1161,7 @@
         btn.onclick = () => {
           const [dIdx, sIdx] = btn.dataset.addEx.split(":").map(Number);
           const ses = week.days[dIdx].sessions[sIdx];
-          ses.exercises.push({ id: `ex-${Date.now()}`, name: "Nuevo ejercicio", sets: 3, reps: "10", weight: 0, done: false });
+          ses.exercises.push({ id: `ex-${Date.now()}`, name: "Nuevo ejercicio", sets: 3, reps: "10", weight: 10, done: false });
           propagateGymRoutine(state.currentWeekIdx, dIdx, ses.exercises);
           persistState();
           renderWeek();
@@ -1251,30 +1170,35 @@
 
       document.querySelectorAll("[data-gym-photo]").forEach(inp => {
         inp.onchange = async () => {
-          const files = Array.from(inp.files || []);
-          if (!files.length) return;
+          const file = inp.files?.[0];
+          if (!file) return;
           const [dIdx, sIdx] = inp.dataset.gymPhoto.split(":").map(Number);
-          showToast("Leyendo rutina con Gemini IA...");
-          const imgs = await Promise.all(files.map(fileToBase64));
-          const prompt = `Extrae los ejercicios de gimnasio de esta imagen y devuelve SOLO un JSON con formato: {"exercises":[{"name":"string","sets":3,"reps":"10","weight":0}]}.`;
-          const raw = await callGemini(prompt, imgs, true);
-          const parsed = extractJsonObject(raw);
-          if (parsed && Array.isArray(parsed.exercises) && parsed.exercises.length > 0) {
-            const ses = week.days[dIdx].sessions[sIdx];
-            ses.exercises = parsed.exercises.map((e, i) => ({
-              id: `ai-ex-${Date.now()}-${i}`,
-              name: e.name || "Ejercicio",
-              sets: Number(e.sets) || 3,
-              reps: String(e.reps || "10"),
-              weight: Number(e.weight) || 0,
-              done: false
-            }));
-            propagateGymRoutine(state.currentWeekIdx, dIdx, ses.exercises);
-            persistState();
-            renderWeek();
-            showToast("Rutina importada y propagada ✓");
-          } else {
-            showToast("No se pudieron leer ejercicios");
+          showToast("Leyendo rutina con IA...");
+          try {
+            const img = await fileToBase64(file);
+            const raw = await callGemini(
+              `Extrae los ejercicios de gimnasio de esta imagen en JSON puro con formato: {"exercises":[{"name":"Nombre ejercicio","sets":3,"reps":"10","weight":0}]}. Sin texto extra.`,
+              [img],
+              true
+            );
+            const parsed = extractJsonFromText(raw);
+            if (Array.isArray(parsed.exercises) && parsed.exercises.length) {
+              const ses = week.days[dIdx].sessions[sIdx];
+              ses.exercises = parsed.exercises.map((e, i) => ({
+                id: `gp-${Date.now()}-${i}`,
+                name: e.name || "Ejercicio",
+                sets: Number(e.sets) || 3,
+                reps: String(e.reps || "10"),
+                weight: Number(e.weight) || 0,
+                done: false
+              }));
+              propagateGymRoutine(state.currentWeekIdx, dIdx, ses.exercises);
+              persistState();
+              renderWeek();
+              showToast("Rutina importada de foto");
+            }
+          } catch (err) {
+            showToast("Error leyendo rutina: " + err.message);
           }
         };
       });
@@ -1283,25 +1207,24 @@
         btn.onclick = () => {
           const dIdx = Number(btn.dataset.dayMenu);
           const day = week.days[dIdx];
-          openModal({
-            title: `${day.dayName} (en OFF)`,
-            bodyHtml: `<p class="text-xs text-slate-600">¿Deseas reactivar este día con una sesión?</p>
-              <select id="m-reactivate-type" class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 text-xs font-bold">
-                <option value="run">Carrera aeróbica (40 min)</option>
-                <option value="gym">Gimnasio / Movilidad (40 min)</option>
-              </select>`,
-            confirmText: "Activar día",
-            onConfirm: () => {
-              const t = document.getElementById("m-reactivate-type").value;
-              day.off = false;
-              day.sessions = [
-                t === "run"
-                  ? makeSession(`s-${Date.now()}`, "run", "Rodaje Z2 aeróbico", 40, "148-155 ppm", "5:50-6:10", "12' entrada progresiva + 28' Zona 2")
-                  : makeSession(`s-${Date.now()}`, "gym", "Fuerza + Movilidad", 40, "-", "-", "Sesión de fuerza controlada", "upper")
-              ];
-              persistState();
-              renderWeek();
-            }
+          openModal(`${day.dayName} · Activar sesión`, `
+            <div class="space-y-2 text-xs">
+              <label class="block font-bold text-slate-700">Tipo de sesión</label>
+              <select id="m-new-type" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold">
+                <option value="run">Carrera</option>
+                <option value="gym">Gimnasio</option>
+              </select>
+              <input id="m-new-title" type="text" value="Rodaje suave Z2" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
+              <input id="m-new-dur" type="number" value="40" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
+            </div>
+          `, () => {
+            const type = document.getElementById("m-new-type").value;
+            const title = document.getElementById("m-new-title").value || "Sesión extra";
+            const dur = Number(document.getElementById("m-new-dur").value) || 40;
+            day.off = false;
+            day.sessions = [makeSession(`s-${Date.now()}`, type, title, dur, type === "run" ? "148-155 ppm" : "-", "-", title, type === "gym" ? "upper" : null)];
+            persistState();
+            renderWeek();
           });
         };
       });
@@ -1310,69 +1233,73 @@
         btn.onclick = () => {
           const [dIdx, sIdx] = btn.dataset.sessionMenu.split(":").map(Number);
           const day = week.days[dIdx];
-          const ses = day.sessions[sIdx];
-          openModal({
-            title: `Opciones · ${day.dayName}`,
-            bodyHtml: `
-              <div class="space-y-2 text-xs">
+          const s = day.sessions[sIdx];
+          const dayOptions = week.days.map((d, idx) => `<option value="${idx}" ${idx === dIdx ? "selected" : ""}>${d.dayName}</option>`).join("");
+          openModal(`${day.dayName} · ${s.title}`, `
+            <div class="space-y-2 text-xs">
+              <label class="block font-bold text-slate-700">Título / Series</label>
+              <input id="m-edit-title" type="text" value="${escapeHtml(s.title)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
+              <div class="grid grid-cols-2 gap-2">
                 <div>
-                  <label class="font-bold text-slate-500">Título</label>
-                  <input id="m-ses-title" type="text" value="${escapeHtml(ses.title)}" class="mt-0.5 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 font-bold" />
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <div>
-                    <label class="font-bold text-slate-500">Duración (min)</label>
-                    <input id="m-ses-dur" type="number" value="${escapeHtml(ses.durationMin)}" class="mt-0.5 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 font-bold" />
-                  </div>
-                  <div>
-                    <label class="font-bold text-slate-500">Pulso objetivo</label>
-                    <input id="m-ses-hr" type="text" value="${escapeHtml(ses.targetHr)}" class="mt-0.5 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 font-bold" />
-                  </div>
+                  <label class="block font-bold text-slate-700">Duración (min)</label>
+                  <input id="m-edit-dur" type="number" value="${escapeHtml(s.durationMin)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
                 </div>
                 <div>
-                  <label class="font-bold text-slate-500">Estructura</label>
-                  <textarea id="m-ses-struct" rows="2" class="mt-0.5 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2">${escapeHtml(ses.structure)}</textarea>
+                  <label class="block font-bold text-slate-700">Pulso objetivo</label>
+                  <input id="m-edit-hr" type="text" value="${escapeHtml(s.targetHr)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
+                </div>
+              </div>
+              <label class="block font-bold text-slate-700">Estructura</label>
+              <input id="m-edit-str" type="text" value="${escapeHtml(s.structure)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2" />
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label class="block font-bold text-slate-700">Mover / Permutar a</label>
+                  <select id="m-swap-day" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold">${dayOptions}</select>
                 </div>
                 <div>
-                  <label class="font-bold text-slate-500">Acción rápida</label>
-                  <select id="m-ses-action" class="mt-0.5 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 font-bold">
-                    <option value="save">Guardar cambios</option>
-                    <option value="double">Añadir doble sesión al día</option>
-                    <option value="off">Pasar día a OFF / Descanso</option>
-                    <option value="fail">Marcar sesión como fallida</option>
-                    <option value="swap-next">Intercambiar con día siguiente</option>
+                  <label class="block font-bold text-slate-700">Estado rápido</label>
+                  <select id="m-status-sel" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold">
+                    <option value="pending" ${s.status === "pending" ? "selected" : ""}>Pendiente</option>
+                    <option value="done" ${s.status === "done" ? "selected" : ""}>Completada</option>
+                    <option value="failed" ${s.status === "failed" ? "selected" : ""}>Fallida</option>
+                    <option value="off">Pasar día a OFF</option>
+                    <option value="double">+ Añadir doble sesión</option>
                   </select>
                 </div>
               </div>
-            `,
-            confirmText: "Aplicar",
-            onConfirm: () => {
-              const act = document.getElementById("m-ses-action").value;
-              ses.title = document.getElementById("m-ses-title").value.trim() || ses.title;
-              ses.durationMin = Number(document.getElementById("m-ses-dur").value) || ses.durationMin;
-              ses.targetHr = document.getElementById("m-ses-hr").value.trim() || ses.targetHr;
-              ses.structure = document.getElementById("m-ses-struct").value.trim() || ses.structure;
+              <input id="m-fail-reason" type="text" value="${escapeHtml(s.failReason || "")}" placeholder="Motivo si fallida (opcional)" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2" />
+            </div>
+          `, () => {
+            s.title = document.getElementById("m-edit-title").value;
+            s.durationMin = Number(document.getElementById("m-edit-dur").value) || s.durationMin;
+            s.targetHr = document.getElementById("m-edit-hr").value;
+            s.structure = document.getElementById("m-edit-str").value;
+            s.failReason = document.getElementById("m-fail-reason").value;
 
-              if (act === "double") {
-                day.sessions.push(makeSession(`dbl-${Date.now()}`, "gym", "Core / Movilidad extra", 25, "-", "-", "Trabajo complementario suave", "core"));
-              } else if (act === "off") {
-                day.off = true;
-                day.sessions = [];
-              } else if (act === "fail") {
-                ses.status = "failed";
-                ses.failReason = "No completada / fatiga";
-              } else if (act === "swap-next") {
-                const nextIdx = (dIdx + 1) % 7;
-                const tmpSessions = week.days[dIdx].sessions;
-                const tmpOff = week.days[dIdx].off;
-                week.days[dIdx].sessions = week.days[nextIdx].sessions;
-                week.days[dIdx].off = week.days[nextIdx].off;
-                week.days[nextIdx].sessions = tmpSessions;
-                week.days[nextIdx].off = tmpOff;
-              }
-              persistState();
-              renderWeek();
+            const st = document.getElementById("m-status-sel").value;
+            const targetDayIdx = Number(document.getElementById("m-swap-day").value);
+
+            if (st === "off") {
+              day.off = true;
+              day.sessions = [];
+            } else if (st === "double") {
+              day.sessions.push(makeSession(`dbl-${Date.now()}`, "gym", "Core / Movilidad extra", 25, "-", "-", "Sesión complementaria", "core"));
+            } else {
+              s.status = st;
             }
+
+            if (targetDayIdx !== dIdx && st !== "off") {
+              const targetDay = week.days[targetDayIdx];
+              const tmp = targetDay.sessions;
+              const tmpOff = targetDay.off;
+              targetDay.sessions = day.sessions;
+              targetDay.off = false;
+              day.sessions = tmp;
+              day.off = tmpOff || day.sessions.length === 0;
+            }
+
+            persistState();
+            renderWeek();
           });
         };
       });
@@ -1384,73 +1311,74 @@
       const day = week.days[dayIdx];
       const ses = day.sessions[sesIdx];
 
-      document.getElementById("rd-day-badge").textContent = `${day.dayName} · Semana ${week.weekNum}`;
-      document.getElementById("rd-type-tag").textContent = "Sesión de Carrera";
+      document.getElementById("rd-day-badge").textContent = `${week.label.split("(")[0].trim()} · ${day.dayName}`;
+      document.getElementById("rd-type-tag").textContent = "CARRERA";
       document.getElementById("rd-title").textContent = ses.title;
       document.getElementById("rd-structure").textContent = ses.structure;
 
-      const targets = [
-        `${ses.durationMin} min`,
-        ses.targetHr && ses.targetHr !== "-" ? `Pulso: ${ses.targetHr}` : "",
-        ses.targetPace && ses.targetPace !== "-" ? `Ritmo: ${ses.targetPace}/km` : ""
-      ].filter(Boolean);
-      document.getElementById("rd-targets").innerHTML = targets.map(t => `<span class="rounded-lg bg-[#f7f7fa] border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700">${escapeHtml(t)}</span>`).join("");
+      const targetsEl = document.getElementById("rd-targets");
+      targetsEl.innerHTML = `
+        <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-700">Duración: ${escapeHtml(ses.durationMin)} min</span>
+        ${ses.targetHr ? `<span class="rounded-lg bg-orange-50 px-2.5 py-1 text-[11px] font-extrabold text-[#fc4c02]">Pulso: ${escapeHtml(ses.targetHr)}</span>` : ""}
+        ${ses.targetPace ? `<span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-700">Ritmo: ${escapeHtml(ses.targetPace)}/km</span>` : ""}
+      `;
 
-      const doneBtn = document.getElementById("rd-toggle-done");
+      const toggleBtn = document.getElementById("rd-toggle-done");
       const syncDoneBtn = () => {
-        const isDone = ses.status === "done";
-        doneBtn.textContent = isDone ? "Completada ✓" : "Marcar hecha";
-        doneBtn.className = isDone
+        const done = ses.status === "done";
+        toggleBtn.textContent = done ? "Completada ✓" : "Marcar hecha";
+        toggleBtn.className = done
           ? "rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white"
-          : "rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-3 py-1.5 text-xs font-extrabold text-slate-700";
+          : "rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700";
       };
       syncDoneBtn();
-      doneBtn.onclick = () => {
+      toggleBtn.onclick = () => {
         ses.status = ses.status === "done" ? "pending" : "done";
         syncDoneBtn();
         persistState();
         renderWeek();
       };
 
-      renderAuditSection(ses);
+      renderRunAuditData(ses.audit);
 
       const modal = document.getElementById("run-detail-modal");
       modal.classList.remove("hidden");
       modal.classList.add("flex");
     }
 
-    function renderAuditSection(ses) {
+    function renderRunAuditData(audit) {
       const mCard = document.getElementById("rd-metrics-card");
       const sCard = document.getElementById("rd-splits-card");
-      if (!ses.audit) {
+      if (!audit) {
         mCard.classList.add("hidden");
         sCard.classList.add("hidden");
         return;
       }
-      const a = ses.audit;
       mCard.classList.remove("hidden");
-      document.getElementById("rd-m-dist").textContent = a.distanceKm ? `${a.distanceKm} km` : "-";
-      document.getElementById("rd-m-time").textContent = a.timeStr || "-";
-      document.getElementById("rd-m-pace").textContent = a.avgPace ? `${a.avgPace} /km` : "-";
-      document.getElementById("rd-m-hr").textContent = a.avgHr ? `${a.avgHr} ppm` : "-";
+      document.getElementById("rd-m-dist").textContent = audit.distanceKm ? `${audit.distanceKm} km` : "-";
+      document.getElementById("rd-m-time").textContent = audit.timeStr || "-";
+      document.getElementById("rd-m-pace").textContent = audit.avgPace ? `${audit.avgPace}/km` : "-";
+      document.getElementById("rd-m-hr").textContent = audit.avgHr ? `${audit.avgHr} ppm` : "-";
 
       const cadEl = document.getElementById("rd-m-cad");
-      const cadNum = Number(a.avgCadence) || 0;
-      cadEl.textContent = cadNum ? `${cadNum} ppm ${cadNum < state.profile.cadenceMin ? "(Bajo objetivo)" : "✓"}` : "-";
-      cadEl.className = `mt-0.5 text-lg font-black ${cadNum && cadNum < state.profile.cadenceMin ? "text-amber-600" : "text-emerald-700"}`;
+      const cadVal = Number(audit.avgCadence) || 0;
+      cadEl.textContent = cadVal ? `${cadVal} ppm` : "-";
+      cadEl.className = cadVal > 0 && cadVal < state.profile.cadenceMin
+        ? "mt-0.5 text-lg font-black text-red-600"
+        : "mt-0.5 text-lg font-black text-emerald-700";
 
-      document.getElementById("rd-summary-text").textContent = a.summary || "";
-      document.getElementById("rd-bullets").innerHTML = (a.bullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join("");
+      document.getElementById("rd-summary-text").textContent = audit.summary || "";
+      document.getElementById("rd-bullets").innerHTML = (audit.bullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join("");
 
-      if (Array.isArray(a.splits) && a.splits.length > 0) {
+      if (Array.isArray(audit.splits) && audit.splits.length > 0) {
         sCard.classList.remove("hidden");
-        document.getElementById("rd-splits-count").textContent = `${a.splits.length} tramos`;
-        document.getElementById("rd-splits-body").innerHTML = a.splits.map(sp => `
+        document.getElementById("rd-splits-count").textContent = `${audit.splits.length} tramos`;
+        document.getElementById("rd-splits-body").innerHTML = audit.splits.map(sp => `
           <tr>
             <td class="py-2 pr-2 font-bold text-slate-800">${escapeHtml(sp.label || "-")}</td>
             <td class="py-2 px-2 text-slate-600">${escapeHtml(sp.durationOrDist || "-")}</td>
-            <td class="py-2 px-2 font-bold text-[#fc4c02]">${escapeHtml(sp.pace || "-")}</td>
-            <td class="py-2 pl-2 text-right font-bold text-slate-800">${escapeHtml(sp.hr || "-")}</td>
+            <td class="py-2 px-2 font-extrabold text-[#fc4c02]">${escapeHtml(sp.pace || "-")}</td>
+            <td class="py-2 pl-2 text-right font-bold text-slate-700">${escapeHtml(sp.hr || "-")}</td>
           </tr>
         `).join("");
       } else {
@@ -1459,123 +1387,97 @@
     }
 
     function renderProgreso() {
-      const latestPace = state.paceHistory[state.paceHistory.length - 1];
+      const hasPace = state.paceHistory.length > 0;
       const valEl = document.getElementById("est-pace-val");
       const confEl = document.getElementById("est-pace-conf");
-      const noteEl = document.getElementById("est-pace-note");
       const chartBtn = document.getElementById("toggle-pace-chart");
+      const noteEl = document.getElementById("est-pace-note");
+      const bulletsEl = document.getElementById("pace-ai-bullets");
 
-      if (!latestPace) {
+      if (!hasPace) {
         valEl.textContent = "Sin datos registrados";
         confEl.classList.add("hidden");
         chartBtn.classList.add("hidden");
-        noteEl.textContent = "Sube capturas de Garmin en tus sesiones de carrera para calcular tu ritmo estimado en 21,1 km.";
+        noteEl.textContent = "Sube una captura de Garmin en cualquier sesión de carrera para calcular tu ritmo estimado actual en 21,1 km.";
+        bulletsEl.innerHTML = "";
       } else {
-        valEl.textContent = `${latestPace.pace}/km`;
-        confEl.textContent = `21K est. ${latestPace.finishTime || ""}`;
+        const last = state.paceHistory[state.paceHistory.length - 1];
+        valEl.textContent = `${last.pace}/km`;
+        confEl.textContent = last.finishEst || "Proyección 21.1K";
         confEl.classList.remove("hidden");
         chartBtn.classList.remove("hidden");
-        noteEl.textContent = `Actualizado ${latestPace.date} · Objetivo Sub-2h: ≤ 5:38/km en reloj (meta plan 5:15–5:25/km).`;
+        noteEl.textContent = `Actualizado el ${last.date} · Objetivo Sub-2h (< 5:40/km · meta plan 5:15–5:25/km)`;
+        bulletsEl.innerHTML = (state.paceBullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join("");
       }
 
-      document.getElementById("pace-ai-bullets").innerHTML = (state.paceBullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join("");
-
-      const curW = state.weights[state.weights.length - 1]?.val ?? state.profile.weight;
-      document.getElementById("current-weight-pill").textContent = `${String(curW).replace(".", ",")} kg`;
-      document.getElementById("weight-list").innerHTML = [...state.weights].reverse().slice(0, 6).map(w => `
-        <li class="flex items-center justify-between rounded-xl bg-[#f7f7fa] px-3 py-1.5 border border-slate-100">
-          <span class="font-bold text-slate-800">${String(w.val).replace(".", ",")} kg</span>
-          <span class="text-slate-400">${escapeHtml(w.date)}${w.note ? ` · ${escapeHtml(w.note)}` : ""}</span>
+      const wPill = document.getElementById("current-weight-pill");
+      wPill.textContent = `${String(state.profile.weight).replace(".", ",")} kg`;
+      document.getElementById("weight-list").innerHTML = [...state.weights].reverse().slice(0, 8).map(w => `
+        <li class="flex items-center justify-between rounded-xl bg-[#f7f7fa] px-3 py-2 border border-slate-100">
+          <span class="font-bold text-slate-800">${escapeHtml(w.date)} · ${escapeHtml(String(w.val).replace(".", ","))} kg</span>
+          <span class="text-slate-500">${escapeHtml(w.note || "")}</span>
         </li>
       `).join("");
 
-      drawSimpleLineChart("weight-svg", state.weights.map(w => ({ xLabel: w.date.slice(5), y: Number(w.val) })), "#fc4c02");
-      if (state.paceHistory.length > 0) {
-        drawSimpleLineChart("pace-svg", state.paceHistory.map(p => ({ xLabel: p.date.slice(5), y: Number(p.paceSec) })), "#10b981", true);
-      }
+      drawWeightSvg();
     }
 
-    function drawSimpleLineChart(svgId, points, color, invertY = false) {
-      const svg = document.getElementById(svgId);
-      if (!svg) return;
-      if (!points || points.length === 0) {
-        svg.innerHTML = `<text x="170" y="84" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="700">Sin registros suficientes</text>`;
+    function drawWeightSvg() {
+      const svg = document.getElementById("weight-svg");
+      const pts = state.weights;
+      if (!pts.length) {
+        svg.innerHTML = "";
         return;
       }
-      const w = 340, h = 160, pad = 26;
-      const ys = points.map(p => p.y);
-      const minY = Math.min(...ys) - 0.5;
-      const maxY = Math.max(...ys) + 0.5;
-      const spanY = Math.max(0.1, maxY - minY);
-
-      const coords = points.map((p, i) => {
-        const x = points.length === 1 ? w / 2 : pad + (i / (points.length - 1)) * (w - pad * 2);
-        const norm = (p.y - minY) / spanY;
-        const y = invertY ? pad + norm * (h - pad * 2) : h - pad - norm * (h - pad * 2);
-        return { x, y, label: p.xLabel, val: p.y };
+      const vals = pts.map(p => Number(p.val));
+      const minV = Math.min(...vals) - 0.5;
+      const maxV = Math.max(...vals) + 0.5;
+      const span = Math.max(0.5, maxV - minV);
+      const coords = pts.map((p, idx) => {
+        const x = pts.length === 1 ? 170 : 28 + (idx / (pts.length - 1)) * 284;
+        const y = 132 - ((Number(p.val) - minV) / span) * 100;
+        return { x, y, val: p.val, date: p.date };
       });
-
-      const poly = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
-      const dots = coords.map(c => `
-        <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="${color}" />
-        <text x="${c.x.toFixed(1)}" y="${(c.y - 8).toFixed(1)}" text-anchor="middle" fill="#0f172a" font-size="9" font-weight="800">${invertY ? formatSecToPace(c.val) : c.val}</text>
-      `).join("");
-
+      const poly = coords.map(c => `${c.x},${c.y}`).join(" ");
       svg.innerHTML = `
-        <polyline fill="none" stroke="${color}" stroke-width="2.5" points="${poly}" />
-        ${dots}
+        <polyline fill="none" stroke="#fc4c02" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${poly}" />
+        ${coords.map(c => `
+          <circle cx="${c.x}" cy="${c.y}" r="4.5" fill="#fc4c02" stroke="#ffffff" stroke-width="2" />
+          <text x="${c.x}" y="${Math.max(16, c.y - 9)}" text-anchor="middle" font-size="10" font-weight="800" fill="#0f172a">${String(c.val).replace(".", ",")}</text>
+        `).join("")}
       `;
     }
 
-    function formatSecToPace(sec) {
-      const m = Math.floor(sec / 60);
-      const s = Math.round(sec % 60);
-      return `${m}:${String(s).padStart(2, "0")}`;
-    }
-
-    function renderConsultor() {
-      const histEl = document.getElementById("chat-history");
-      histEl.innerHTML = state.chatHistory.slice(-10).map(m => `
-        <div class="rounded-xl p-3 text-xs ${m.role === "user" ? "bg-slate-900 text-white ml-6" : "bg-[#f7f7fa] border border-slate-200 text-slate-800 mr-4"}">
-          <div class="mb-1 text-[10px] font-extrabold uppercase opacity-60">${m.role === "user" ? "Tú" : "Entrenador IA"}</div>
-          <div class="whitespace-pre-line leading-relaxed">${escapeHtml(m.text)}</div>
+    function renderChat() {
+      const box = document.getElementById("chat-history");
+      if (!state.chatHistory.length) {
+        box.innerHTML = `<p class="text-[11px] text-slate-400">Sin consultas recientes. Usa un acceso rápido o escribe tu duda arriba.</p>`;
+        return;
+      }
+      box.innerHTML = state.chatHistory.slice(-8).map(m => `
+        <div class="rounded-xl p-3 text-xs ${m.role === "user" ? "bg-slate-900 text-white ml-6" : "bg-[#f7f7fa] border border-slate-200 text-slate-800 mr-4 whitespace-pre-line"}">
+          ${escapeHtml(m.text)}
         </div>
       `).join("");
+    }
 
-      const mSel = document.getElementById("meals-week-select");
-      mSel.innerHTML = state.weeks.map((w, idx) => `<option value="${idx}" ${idx === state.mealsWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`).join("");
-      const mWeek = state.weeks[state.mealsWeekIdx];
-      document.getElementById("meals-week-ref").textContent = mWeek ? mWeek.phase : "";
-      const savedMeals = state.mealsByWeek[state.mealsWeekIdx];
-      document.getElementById("meals-output").innerHTML = savedMeals
-        ? `<div class="rounded-xl border border-slate-200 bg-[#f7f7fa] p-3 whitespace-pre-line leading-relaxed">${escapeHtml(savedMeals)}</div>`
-        : `<p class="text-slate-400">Pulsa "Generar semana" para crear la pauta nutricional adaptada a la carga de esta semana.</p>`;
+    function renderMeals() {
+      const sel = document.getElementById("meals-week-select");
+      sel.innerHTML = state.weeks.map((w, idx) =>
+        `<option value="${idx}" ${idx === state.mealsWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`
+      ).join("");
+      const week = state.weeks[state.mealsWeekIdx];
+      document.getElementById("meals-week-ref").textContent = week.phase;
+      const saved = state.mealsByWeek[state.mealsWeekIdx];
+      const out = document.getElementById("meals-output");
+      if (!saved) {
+        out.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-4 text-center text-slate-400">Pulsa <strong>Generar semana</strong> para crear la pauta nutricional adaptada a los entrenamientos activos de ${escapeHtml(week.label)}.</div>`;
+      } else {
+        out.innerHTML = `<div class="rounded-xl border border-slate-100 bg-[#f7f7fa] p-3.5 whitespace-pre-line leading-relaxed">${escapeHtml(saved)}</div>`;
+      }
     }
 
     function renderPerfil() {
-      const gList = document.getElementById("goals-list");
-      gList.innerHTML = state.goals.map(g => `
-        <div class="py-2.5 flex items-center justify-between gap-2">
-          <div>
-            <div class="text-xs font-extrabold text-slate-900">${escapeHtml(g.name)}</div>
-            <div class="text-[11px] text-slate-500">Ritmo meta: ${escapeHtml(g.pace)}/km · Fecha: ${escapeHtml(g.date)}</div>
-          </div>
-          ${g.active
-            ? `<span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700">Activo</span>`
-            : `<button data-activate-goal="${g.id}" class="rounded-lg border border-[#e2e8f0] bg-[#f7f7fa] px-2.5 py-1 text-[11px] font-bold text-slate-700">Activar</button>`}
-        </div>
-      `).join("");
-
-      document.querySelectorAll("[data-activate-goal]").forEach(btn => {
-        btn.onclick = () => {
-          const id = btn.dataset.activateGoal;
-          state.goals.forEach(g => { g.active = g.id === id; });
-          persistState();
-          renderHeader();
-          renderPerfil();
-        };
-      });
-
       document.getElementById("p-height").value = state.profile.height;
       document.getElementById("p-weight").value = state.profile.weight;
       document.getElementById("p-cadence").value = state.profile.cadenceMin;
@@ -1585,36 +1487,111 @@
       document.getElementById("z-vt2").value = state.profile.zones.vt2;
       document.getElementById("z-vo2").value = state.profile.zones.vo2;
       document.getElementById("p-notes").value = state.profile.notes || "";
-      document.getElementById("k-gemini").value = state.profile.geminiKey || DEFAULT_API_KEY;
-      updateApiKeyPreviewBadge();
+      document.getElementById("k-gemini").value = state.profile.geminiKey || "";
 
-      const renderDayChips = (containerId, selectedArr, propName) => {
-        const el = document.getElementById(containerId);
-        el.innerHTML = WEEKDAYS.map(d => {
-          const on = selectedArr.includes(d.key);
-          return `<button type="button" data-day-chip="${propName}:${d.key}" class="rounded-xl py-2 text-xs font-extrabold border ${on ? "border-[#fc4c02] bg-[#fc4c02] text-white" : "border-[#e2e8f0] bg-[#f7f7fa] text-slate-600"}">${d.key}</button>`;
-        }).join("");
-      };
-      renderDayChips("pref-run-days", state.profile.prefRunDays, "prefRunDays");
-      renderDayChips("pref-gym-days", state.profile.prefGymDays, "prefGymDays");
+      document.getElementById("goals-list").innerHTML = state.goals.map((g, idx) => `
+        <div class="flex items-center justify-between py-2.5">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-extrabold text-slate-900">${escapeHtml(g.name)}</span>
+              ${g.active ? `<span class="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800">Activo</span>` : ""}
+            </div>
+            <div class="text-[11px] text-slate-500">Ritmo: ${escapeHtml(g.pace)}/km · Fecha: ${escapeHtml(g.date)}</div>
+          </div>
+          ${!g.active ? `<button type="button" data-activate-goal="${idx}" class="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700">Activar</button>` : ""}
+        </div>
+      `).join("");
 
-      document.querySelectorAll("[data-day-chip]").forEach(btn => {
+      document.querySelectorAll("[data-activate-goal]").forEach(btn => {
         btn.onclick = () => {
-          const [prop, k] = btn.dataset.dayChip.split(":");
-          const arr = state.profile[prop];
-          const idx = arr.indexOf(k);
-          if (idx >= 0) arr.splice(idx, 1);
-          else arr.push(k);
+          const idx = Number(btn.dataset.activateGoal);
+          state.goals.forEach((g, i) => g.active = i === idx);
+          persistState();
+          renderHeader();
           renderPerfil();
         };
       });
+
+      const renderDayChips = (containerId, selectedArr, stateField) => {
+        const el = document.getElementById(containerId);
+        el.innerHTML = WEEKDAYS.map(d => {
+          const active = selectedArr.includes(d.key);
+          return `<button type="button" data-pref="${stateField}:${d.key}" class="rounded-xl border py-2 text-xs font-extrabold ${active ? "border-[#fc4c02] bg-[#fc4c02] text-white" : "border-slate-200 bg-[#f7f7fa] text-slate-600"}">${d.key}</button>`;
+        }).join("");
+        el.querySelectorAll("[data-pref]").forEach(b => {
+          b.onclick = () => {
+            const [field, k] = b.dataset.pref.split(":");
+            const list = state.profile[field];
+            const pos = list.indexOf(k);
+            if (pos >= 0) list.splice(pos, 1);
+            else list.push(k);
+            renderDayChips(containerId, list, stateField);
+          };
+        });
+      };
+
+      renderDayChips("pref-run-days", state.profile.prefRunDays, "prefRunDays");
+      renderDayChips("pref-gym-days", state.profile.prefGymDays, "prefGymDays");
+      updateApiKeyPreviewBadge();
+    }
+
+    function updateApiKeyPreviewBadge() {
+      const key = (state.profile.geminiKey || "").trim();
+      const badge = document.getElementById("api-key-preview-badge");
+      if (!badge) return;
+      if (!key) {
+        badge.textContent = "Sin clave";
+      } else if (key.length > 10) {
+        badge.textContent = `${key.slice(0, 6)}...${key.slice(-4)}`;
+      } else {
+        badge.textContent = "Configurada";
+      }
+    }
+
+    function switchMainTab(tabName) {
+      const tabs = ["semana", "progreso", "consultor", "perfil"];
+      tabs.forEach(t => {
+        const sec = document.getElementById(`tab-${t}`);
+        const nav = document.getElementById(`nav-${t}`);
+        const isCurrent = t === tabName;
+        sec.classList.toggle("hidden", !isCurrent);
+        nav.classList.toggle("border-[#fc4c02]", isCurrent);
+        nav.classList.toggle("text-[#fc4c02]", isCurrent);
+        nav.classList.toggle("border-transparent", !isCurrent);
+        nav.classList.toggle("text-slate-400", !isCurrent);
+      });
+      if (tabName === "progreso") renderProgreso();
+      if (tabName === "consultor") {
+        renderChat();
+        renderMeals();
+      }
+      if (tabName === "perfil") renderPerfil();
+    }
+
+    function attachSwipe(elementId, onSwipeLeft, onSwipeRight) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      let startX = 0;
+      let startY = 0;
+      el.addEventListener("touchstart", e => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+      }, { passive: true });
+      el.addEventListener("touchend", e => {
+        const dx = e.changedTouches[0].clientX - startX;
+        const dy = e.changedTouches[0].clientY - startY;
+        if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+          if (dx < 0) onSwipeLeft();
+          else onSwipeRight();
+        }
+      }, { passive: true });
     }
 
     function bindGlobalControls() {
-      document.getElementById("nav-semana").onclick = () => switchTab("semana");
-      document.getElementById("nav-progreso").onclick = () => switchTab("progreso");
-      document.getElementById("nav-consultor").onclick = () => switchTab("consultor");
-      document.getElementById("nav-perfil").onclick = () => switchTab("perfil");
+      document.getElementById("nav-semana").onclick = () => switchMainTab("semana");
+      document.getElementById("nav-progreso").onclick = () => switchMainTab("progreso");
+      document.getElementById("nav-consultor").onclick = () => switchMainTab("consultor");
+      document.getElementById("nav-perfil").onclick = () => switchMainTab("perfil");
 
       document.getElementById("prev-week").onclick = () => {
         if (state.currentWeekIdx > 0) {
@@ -1628,7 +1605,7 @@
           renderWeek();
         }
       };
-      document.getElementById("week-select").onchange = (e) => {
+      document.getElementById("week-select").onchange = e => {
         state.currentWeekIdx = Number(e.target.value);
         renderWeek();
       };
@@ -1639,193 +1616,146 @@
 
       document.getElementById("no-wknd-btn").onclick = () => {
         const week = state.weeks[state.currentWeekIdx];
-        const pendingRuns = [];
-        const pendingGyms = [];
-        week.days.forEach(d => {
-          d.sessions.forEach(s => {
-            if (s.status !== "done") {
-              if (s.type === "run") pendingRuns.push(s);
-              else pendingGyms.push(s);
-            }
-          });
-        });
-        [5, 6].forEach(idx => {
-          const d = week.days[idx];
-          if (!d.sessions.some(s => s.status === "done")) {
-            d.off = true;
-            d.sessions = [];
-          }
-        });
-        const weekdaySlots = [0, 1, 2, 3, 4];
-        weekdaySlots.forEach(idx => {
-          if (!week.days[idx].sessions.some(s => s.status === "done")) {
-            week.days[idx].off = false;
-            week.days[idx].sessions = [];
-          }
-        });
-        if (pendingRuns[0]) week.days[0].sessions.push(pendingRuns[0]);
-        if (pendingGyms[0]) week.days[1].sessions.push(pendingGyms[0]);
-        if (pendingRuns[1]) week.days[2].sessions.push(pendingRuns[1]);
-        if (pendingGyms[1]) week.days[3].sessions.push(pendingGyms[1]);
-        if (pendingRuns[2]) week.days[4].sessions.push(pendingRuns[2]);
-        persistState();
-        renderWeek();
-        showToast("Reorganizado a Lunes–Viernes (3 carrera / 2 gym)");
+        const sat = week.days[5];
+        const fri = week.days[4];
+        const lr = sat.sessions.find(s => s.type === "run");
+        if (lr && lr.status === "pending") {
+          fri.off = false;
+          fri.sessions = [lr];
+          sat.off = true;
+          sat.sessions = [];
+          week.days[6].off = true;
+          week.days[6].sessions = [];
+          persistState();
+          renderWeek();
+          showToast("Semana adaptada sin finde (3 carrera / 2 gym)");
+        } else {
+          showToast("La tirada larga ya estaba ajustada o completada");
+        }
       };
 
       document.getElementById("ai-adapt-run").onclick = async () => {
-        const feedback = document.getElementById("ai-adapt-input").value.trim();
-        if (!feedback) {
-          showToast("Escribe tus sensaciones o disponibilidad");
-          return;
-        }
+        const msg = document.getElementById("ai-adapt-input").value.trim();
+        if (!msg) return showToast("Describe tus sensaciones o disponibilidad");
+        const box = document.getElementById("ai-adapt-proposal");
+        box.innerHTML = `<div class="rounded-xl bg-orange-50 p-2.5 text-xs font-bold text-[#fc4c02]">Analizando sensaciones con Gemini IA...</div>`;
         const week = state.weeks[state.currentWeekIdx];
-        const propBox = document.getElementById("ai-adapt-proposal");
-        propBox.innerHTML = `<p class="text-xs font-bold text-[#fc4c02]">Analizando sensaciones y diseñando ajuste...</p>`;
-
-        const prompt = `Eres un entrenador de running técnico (cero peloteo, directo). Perfil: 183cm, ${state.profile.weight}kg, objetivo Media Maratón Sub-2h (5:15-5:25/km), zonas VT1=${state.profile.zones.vt1}, Z2=${state.profile.zones.z2}, Tempo=${state.profile.zones.tempo}, VT2=${state.profile.zones.vt2}, cadencia mínima ${state.profile.cadenceMin} ppm.
-Semana actual (${week.label}, ${week.phase}):
-${JSON.stringify(week.days)}
-Sensaciones/petición del atleta: "${feedback}"
+        try {
+          const prompt = `Eres un entrenador de running directo y experto en prevención articular (rótula, cintilla iliotibial).
+Atleta: 183 cm, ${state.profile.weight} kg, objetivo Media Maratón Sub-2h (5:15-5:25/km), zonas VT1 ${state.profile.zones.vt1}, Z2 ${state.profile.zones.z2}, VT2 ${state.profile.zones.vt2}, cadencia mín ${state.profile.cadenceMin} ppm.
+Semana actual (${week.label}): ${JSON.stringify(week.days)}.
+Sensaciones/petición del atleta: "${msg}".
 Reglas:
-1. Respeta intactas las sesiones con status="done".
-2. Adapta las sesiones pendientes según sus sensaciones reales (si hay molestia articular o fatiga, ajusta intensidad/volumen y prioriza protección articular sin usar reglas rígidas fijas; nunca pongas fuerza de pierna el día antes de una tirada larga).
-3. Devuelve SOLO JSON válido: {"summary":"resumen en 2 viñetas cortas","days":[{"dayIndex":0,"off":false,"sessions":[{"type":"run|gym","title":"...","durationMin":40,"targetHr":"148-155 ppm","targetPace":"5:50","structure":"..."}]}]}`;
-
-        const raw = await callGemini(prompt, [], true);
-        const parsed = extractJsonObject(raw);
-        if (!parsed || !Array.isArray(parsed.days)) {
-          propBox.innerHTML = `<p class="text-xs font-bold text-red-600">No se pudo generar propuesta. Revisa la conexión IA.</p>`;
-          return;
-        }
-
-        propBox.innerHTML = `
-          <div class="rounded-xl border border-orange-200 bg-orange-50/70 p-3 space-y-2">
-            <div class="text-xs font-extrabold text-slate-900">Propuesta de ajuste según sensaciones:</div>
-            <div class="text-xs text-slate-700 whitespace-pre-line">${escapeHtml(parsed.summary || "")}</div>
-            <button id="confirm-ai-adapt" class="rounded-xl bg-[#fc4c02] px-3 py-1.5 text-xs font-extrabold text-white">Confirmar y aplicar cambios</button>
-          </div>
-        `;
-        document.getElementById("confirm-ai-adapt").onclick = () => {
-          parsed.days.forEach(pd => {
-            const targetDay = week.days[pd.dayIndex];
-            if (!targetDay) return;
-            const doneSessions = targetDay.sessions.filter(s => s.status === "done");
-            if (pd.off && doneSessions.length === 0) {
-              targetDay.off = true;
-              targetDay.sessions = [];
-            } else {
-              targetDay.off = false;
-              const newPending = (pd.sessions || []).map((ns, idx) =>
-                makeSession(
-                  `adp-${Date.now()}-${pd.dayIndex}-${idx}`,
-                  ns.type === "gym" ? "gym" : "run",
-                  ns.title || "Sesión adaptada",
-                  Number(ns.durationMin) || 35,
-                  ns.targetHr || "148-155 ppm",
-                  ns.targetPace || "-",
-                  ns.structure || "",
-                  ns.type === "gym" ? (pd.dayIndex === 0 ? "legs" : "upper") : null
-                )
-              );
-              targetDay.sessions = [...doneSessions, ...newPending];
+1. NO toques sesiones con status="done".
+2. Adapta las sesiones pendientes según sus sensaciones (si reporta molestia articular o fatiga, ajusta volumen/intensidad o sustituye impactos de forma inteligente sin aplicar recortes ciegos; pierna nunca antes de tirada larga).
+3. Devuelve JSON exacto: {"explanation":"Explicación breve en viñetas","days":[...misma estructura de 7 días...]}.`;
+          const raw = await callGemini(prompt, [], true);
+          const data = extractJsonFromText(raw);
+          box.innerHTML = `
+            <div class="rounded-xl border border-orange-200 bg-orange-50/60 p-3 space-y-2 text-xs">
+              <div class="font-extrabold text-slate-900">Propuesta según tus sensaciones:</div>
+              <div class="whitespace-pre-line text-slate-700">${escapeHtml(data.explanation || "")}</div>
+              <button type="button" id="confirm-ai-week-btn" class="rounded-xl bg-[#fc4c02] px-3 py-1.5 text-xs font-extrabold text-white">Aplicar ajuste</button>
+            </div>
+          `;
+          document.getElementById("confirm-ai-week-btn").onclick = () => {
+            if (Array.isArray(data.days) && data.days.length === 7) {
+              week.days = data.days;
+              persistState();
+              renderWeek();
+              box.innerHTML = "";
+              showToast("Semana actualizada según sensaciones");
             }
-          });
-          propBox.innerHTML = "";
-          persistState();
-          renderWeek();
-          showToast("Plan semanal adaptado ✓");
-        };
+          };
+        } catch (err) {
+          box.innerHTML = `<div class="rounded-xl bg-red-50 p-2.5 text-xs font-bold text-red-700">Error IA: ${escapeHtml(err.message)}</div>`;
+        }
       };
 
+      // CERRAR DETALLE CARRERA Y SUBIR CAPTURAS GARMIN
       document.getElementById("close-run-detail").onclick = () => {
         const modal = document.getElementById("run-detail-modal");
         modal.classList.add("hidden");
         modal.classList.remove("flex");
       };
 
-      document.getElementById("rd-photo-input").onchange = async (e) => {
+      document.getElementById("rd-photo-input").onchange = async e => {
         const files = Array.from(e.target.files || []);
         if (!files.length || !activeDetailRef) return;
-        const { weekIdx, dayIdx, sesIdx } = activeDetailRef;
-        const week = state.weeks[weekIdx];
-        const ses = week.days[dayIdx].sessions[sesIdx];
+        const loading = document.getElementById("rd-loading");
+        loading.classList.remove("hidden");
+        try {
+          const imgs = await Promise.all(files.map(fileToBase64));
+          const { weekIdx, dayIdx, sesIdx } = activeDetailRef;
+          const week = state.weeks[weekIdx];
+          const ses = week.days[dayIdx].sessions[sesIdx];
 
-        const loadEl = document.getElementById("rd-loading");
-        loadEl.classList.remove("hidden");
-        const imgs = await Promise.all(files.map(fileToBase64));
-
-        const prompt = `Audita estas capturas de Garmin para la sesión "${ses.title}" (${ses.structure}, objetivo pulso: ${ses.targetHr}, ritmo: ${ses.targetPace}).
-Perfil atleta: zonas VT1=${state.profile.zones.vt1}, Z2=${state.profile.zones.z2}, Tempo=${state.profile.zones.tempo}, VT2=${state.profile.zones.vt2}, cadencia mínima=${state.profile.cadenceMin} ppm.
-REGLA CRÍTICA DE EVALUACIÓN: En rodajes y tiradas largas en Zona 2 (${state.profile.zones.z2} ppm), los primeros 10-15 minutos corresponden al calentamiento fisiológico progresivo desde reposo hasta entrar en Zona 2 sin hacer sprints iniciales. NO penalices ni taches de "lento" ni "fuera de zona" por esos primeros 10-15 minutos; evalúa el pulso y el ritmo real a partir del tramo estabilizado (minuto 12-15 en adelante).
-Combina los datos de todas las capturas sin duplicar parciales.
-Devuelve SOLO JSON:
+          const prompt = `Analiza estas capturas de Garmin de la sesión "${ses.title}" (${ses.structure}, pulso objetivo ${ses.targetHr}).
+Perfil atleta: VT1 ${state.profile.zones.vt1} ppm, Zona 2 ${state.profile.zones.z2} ppm, Tempo ${state.profile.zones.tempo} ppm, VT2 ${state.profile.zones.vt2} ppm, cadencia mínima ${state.profile.cadenceMin} ppm.
+REGLA CRÍTICA DE CALENTAMIENTO INICIAL: En rodajes aeróbicos y tiradas largas en Zona 2, los primeros 10-15 minutos (km 1 y km 2) corresponden a la activación fisiológica progresiva desde reposo hasta alcanzar Zona 2 sin hacer sprints iniciales; NO penalices ni califiques como "lento" o "fuera de zona" ese calentamiento inicial, evalúa el pulso y ritmo reales sobre el tramo estabilizado posterior (minuto 12-15 en adelante).
+Tono: directo, técnico, sin peloteo.
+Devuelve JSON estricto:
 {
   "distanceKm": "6.62",
   "timeStr": "40:02",
   "avgPace": "6:03",
   "avgHr": "145",
-  "avgCadence": "168",
-  "summary": "Diagnóstico técnico directo en 1-2 frases",
+  "avgCadence": "169",
+  "summary": "Resumen técnico en 1-2 frases.",
   "bullets": ["Punto clave 1", "Punto clave 2"],
-  "splits": [{"label":"Km 1","durationOrDist":"1.00 km","pace":"6:25","hr":"134 ppm"}],
-  "nextQualityTitle": "Propuesta series siguiente calidad",
-  "nextQualityStructure": "Estructura concreta por tiempo y pulso",
+  "splits": [{"label":"Km 1 / Serie 1","durationOrDist":"1.0 km","pace":"6:15","hr":"136 ppm"}],
   "est21kPace": "5:28",
-  "est21kPaceSec": 328,
-  "est21kFinish": "1:55:24",
-  "estBullets": ["Dato clave proyección 21K"]
+  "est21kFinish": "1:55:20",
+  "estBullets": ["Motivo proyección 21K 1", "Motivo proyección 21K 2"],
+  "nextQualityTitle": "Nueva prescripción concreta de series para la próxima sesión de calidad"
 }`;
+          const raw = await callGemini(prompt, imgs, true);
+          const parsed = extractJsonFromText(raw);
+          ses.audit = parsed;
+          ses.status = "done";
 
-        const raw = await callGemini(prompt, imgs, true);
-        loadEl.classList.add("hidden");
-        e.target.value = "";
-        const parsed = extractJsonObject(raw);
-        if (!parsed) {
-          showToast("No se pudo interpretar la captura");
-          return;
+          if (parsed.est21kPace) {
+            const today = new Date().toISOString().slice(0, 10);
+            state.paceHistory.push({
+              date: today,
+              pace: parsed.est21kPace,
+              finishEst: parsed.est21kFinish || ""
+            });
+            state.paceBullets = parsed.estBullets || [];
+          }
+
+          if (parsed.nextQualityTitle) {
+            for (let w = weekIdx + 1; w < state.weeks.length; w++) {
+              const qSes = state.weeks[w].days[1]?.sessions?.find(s => s.type === "run" && s.status === "pending");
+              if (qSes) {
+                qSes.title = parsed.nextQualityTitle;
+                qSes.structure = `10' calentamiento Z2 + ${parsed.nextQualityTitle} + 6' enfriamiento`;
+                break;
+              }
+            }
+          }
+
+          persistState();
+          renderWeek();
+          openRunDetail(weekIdx, dayIdx, sesIdx);
+          showToast("Auditoría Garmin completada");
+        } catch (err) {
+          showToast("Error analizando captura: " + err.message);
+        } finally {
+          loading.classList.add("hidden");
+          e.target.value = "";
         }
-
-        ses.audit = {
-          distanceKm: parsed.distanceKm || "",
-          timeStr: parsed.timeStr || "",
-          avgPace: parsed.avgPace || "",
-          avgHr: parsed.avgHr || "",
-          avgCadence: parsed.avgCadence || "",
-          summary: parsed.summary || "",
-          bullets: Array.isArray(parsed.bullets) ? parsed.bullets : [],
-          splits: Array.isArray(parsed.splits) ? parsed.splits : []
-        };
-        ses.status = "done";
-
-        if (parsed.est21kPace && parsed.est21kPaceSec) {
-          const today = new Date().toISOString().slice(0, 10);
-          state.paceHistory.push({
-            date: today,
-            pace: parsed.est21kPace,
-            paceSec: Number(parsed.est21kPaceSec),
-            finishTime: parsed.est21kFinish || ""
-          });
-          if (Array.isArray(parsed.estBullets)) state.paceBullets = parsed.estBullets;
-        }
-
-        persistState();
-        renderAuditSection(ses);
-        renderWeek();
-        showToast("Auditoría Garmin completada ✓");
       };
 
+      // PROGRESO
       document.getElementById("toggle-pace-chart").onclick = () => {
         document.getElementById("pace-chart-wrap").classList.toggle("hidden");
       };
 
       document.getElementById("add-weight-btn").onclick = () => {
-        const val = Number(document.getElementById("new-weight-val").value);
-        if (!val || val < 30 || val > 250) {
-          showToast("Introduce un peso válido");
-          return;
-        }
+        const val = parseFloat(document.getElementById("new-weight-val").value);
         const note = document.getElementById("new-weight-note").value.trim();
+        if (!val || val < 40 || val > 180) return showToast("Introduce un peso válido");
         const today = new Date().toISOString().slice(0, 10);
         state.weights.push({ date: today, val, note });
         state.profile.weight = val;
@@ -1834,9 +1764,10 @@ Devuelve SOLO JSON:
         persistState();
         renderHeader();
         renderProgreso();
-        showToast("Peso registrado ✓");
+        showToast("Peso registrado");
       };
 
+      // CONSULTOR IA Y COMIDAS
       document.getElementById("sub-consultor-btn").onclick = () => {
         document.getElementById("sub-consultor-view").classList.remove("hidden");
         document.getElementById("sub-comidas-view").classList.add("hidden");
@@ -1845,14 +1776,15 @@ Devuelve SOLO JSON:
       };
 
       document.getElementById("sub-comidas-btn").onclick = () => {
-        document.getElementById("sub-comidas-view").classList.remove("hidden");
         document.getElementById("sub-consultor-view").classList.add("hidden");
+        document.getElementById("sub-comidas-view").classList.remove("hidden");
         document.getElementById("sub-comidas-btn").className = "rounded-xl bg-[#fc4c02] py-2 text-xs font-extrabold text-white shadow-2xs";
         document.getElementById("sub-consultor-btn").className = "rounded-xl bg-transparent py-2 text-xs font-bold text-slate-500 hover:text-slate-800";
+        renderMeals();
       };
 
       document.getElementById("goto-api-key-btn").onclick = () => {
-        switchTab("perfil");
+        switchMainTab("perfil");
         document.getElementById("keys-panel").classList.remove("hidden");
       };
 
@@ -1864,69 +1796,69 @@ Devuelve SOLO JSON:
       });
 
       document.getElementById("chat-send-btn").onclick = async () => {
-        const inp = document.getElementById("chat-input");
-        const q = inp.value.trim();
+        const input = document.getElementById("chat-input");
+        const q = input.value.trim();
         if (!q) return;
-        inp.value = "";
+        input.value = "";
         state.chatHistory.push({ role: "user", text: q });
-        renderConsultor();
-
+        renderChat();
         const week = state.weeks[state.currentWeekIdx];
-        const prompt = `Actúa como entrenador personal de running técnico para Media Maratón Sub-2h (5:15-5:25/km). Estilo directo, cero peloteo, respuestas en viñetas escaneables.
-Perfil: 183cm, ${state.profile.weight}kg, VT1=${state.profile.zones.vt1}, Z2=${state.profile.zones.z2}, Tempo=${state.profile.zones.tempo}, VT2=${state.profile.zones.vt2}, VO2MAX=${state.profile.zones.vo2}, cadencia mín=${state.profile.cadenceMin} ppm.
-Semana en curso (${week.label}): ${JSON.stringify(week.days.map(d => ({ dia: d.dayName, off: d.off, sesiones: d.sessions.map(s => `${s.title} (${s.durationMin}m, ${s.status})`) })))}
-Consulta: "${q}"`;
-
-        const ans = await callGemini(prompt, [], false);
-        if (ans) {
+        try {
+          const prompt = `Eres un entrenador personal técnico y directo (cero peloteo, respuestas en viñetas concisas).
+Atleta: 183 cm, ${state.profile.weight} kg, Media Maratón Sub-2h (5:15-5:25/km), zonas VT1 ${state.profile.zones.vt1}, Z2 ${state.profile.zones.z2}, Tempo ${state.profile.zones.tempo}, VT2 ${state.profile.zones.vt2}, cadencia mín ${state.profile.cadenceMin} ppm.
+En rodajes Z2 los primeros 10-15 min son calentamiento progresivo. Ante molestias articulares o fatiga propone ajustes individualizados según sensaciones.
+Semana actual: ${week.label} (${week.phase}).
+Consulta: ${q}`;
+          const ans = await callGemini(prompt, [], false);
           state.chatHistory.push({ role: "ai", text: ans });
           persistState();
-          renderConsultor();
+          renderChat();
+        } catch (err) {
+          state.chatHistory.push({ role: "ai", text: `Error IA: ${err.message}` });
+          renderChat();
         }
       };
 
       document.getElementById("meals-prev-week").onclick = () => {
         if (state.mealsWeekIdx > 0) {
           state.mealsWeekIdx--;
-          renderConsultor();
+          renderMeals();
         }
       };
       document.getElementById("meals-next-week").onclick = () => {
         if (state.mealsWeekIdx < state.weeks.length - 1) {
           state.mealsWeekIdx++;
-          renderConsultor();
+          renderMeals();
         }
       };
-      document.getElementById("meals-week-select").onchange = (e) => {
+      document.getElementById("meals-week-select").onchange = e => {
         state.mealsWeekIdx = Number(e.target.value);
-        renderConsultor();
+        renderMeals();
       };
 
       document.getElementById("gen-meals-btn").onclick = async () => {
-        const mWeek = state.weeks[state.mealsWeekIdx];
-        const outEl = document.getElementById("meals-output");
-        outEl.innerHTML = `<p class="font-bold text-[#fc4c02]">Generando pauta nutricional de ${escapeHtml(mWeek.label)}...</p>`;
-
-        const isRace = mWeek.weekNum === 15;
-        const prompt = `Genera una pauta semanal de comidas en viñetas concisas (desayuno, comida, cena/post-entreno) para un corredor de 183 cm y ${state.profile.weight} kg que prepara Media Maratón Sub-2h con objetivo de pérdida de grasa controlada sin comprometer rendimiento.
-Semana: ${mWeek.label} (${mWeek.phase}).
-Entrenamientos activos: ${JSON.stringify(mWeek.days.filter(d => !d.off).map(d => ({ dia: d.dayName, sesiones: d.sessions.map(s => `${s.type}: ${s.title} (${s.durationMin} min)`) })))}
+        const week = state.weeks[state.mealsWeekIdx];
+        const out = document.getElementById("meals-output");
+        out.innerHTML = `<div class="rounded-xl bg-orange-50 p-3 text-xs font-bold text-[#fc4c02]">Generando planificación semanal de comidas...</div>`;
+        try {
+          const activeDays = week.days.map(d => `${d.dayName}: ${d.off ? "OFF" : d.sessions.map(s => `${s.title} (${s.durationMin}')`).join(" + ")}`).join("\n");
+          const prompt = `Genera una recomendación semanal de comidas práctica y escaneable en viñetas para ${week.label} (${week.phase}).
+Atleta: 183 cm, ${state.profile.weight} kg, objetivo pérdida de grasa + rendimiento Media Maratón.
+Entrenamientos de esa semana:\n${activeDays}\n
 Reglas:
-- Ajusta hidratos según carga diaria (más hidratos antes/después de calidad o tirada larga ≥80 min; más ligero en días OFF o gym suave).
-- Si hay tirada larga ≥85 min, indica prueba de geles e hidratación.
-- ${isRace ? "Es semana de competición: incluye estrategia de carga de hidratos 48h previas, desayuno pre-carrera y geles en carrera." : "No recomiendes suplementos innecesarios."}
-- Formato directo en viñetas por día (Lunes a Domingo).`;
-
-        const ans = await callGemini(prompt, [], false);
-        if (ans) {
+- Ajusta hidratos según carga de cada día (más en calidad y tirada larga, déficit ligero en días OFF).
+- Solo menciona geles/hidratación si hay tirada larga >= 85 min o si es la Semana 15 de carrera (carga de hidratos).
+- Tono directo y sin relleno.`;
+          const ans = await callGemini(prompt, [], false);
           state.mealsByWeek[state.mealsWeekIdx] = ans;
           persistState();
-          renderConsultor();
-        } else {
-          outEl.innerHTML = `<p class="font-bold text-red-600">No se pudo generar la pauta. Comprueba la API Key en Perfil.</p>`;
+          renderMeals();
+        } catch (err) {
+          out.innerHTML = `<div class="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700">Error IA: ${escapeHtml(err.message)}</div>`;
         }
       };
 
+      // PERFIL
       document.getElementById("toggle-new-goal").onclick = () => {
         document.getElementById("new-goal-form").classList.toggle("hidden");
       };
@@ -1935,38 +1867,33 @@ Reglas:
         const name = document.getElementById("new-goal-name").value.trim();
         const pace = document.getElementById("new-goal-pace").value.trim() || "5:20";
         const date = document.getElementById("new-goal-date").value || "2027-02-28";
-        if (!name) {
-          showToast("Escribe el nombre del objetivo");
-          return;
-        }
-        state.goals.forEach(g => { g.active = false; });
+        if (!name) return showToast("Escribe un nombre para el objetivo");
+        state.goals.forEach(g => g.active = false);
         state.goals.unshift({ id: `g-${Date.now()}`, name, pace, date, active: true });
         document.getElementById("new-goal-name").value = "";
         document.getElementById("new-goal-form").classList.add("hidden");
         persistState();
         renderHeader();
         renderPerfil();
-        showToast("Nuevo objetivo activado ✓");
+        showToast("Nuevo objetivo activado");
       };
 
       document.getElementById("save-profile-btn").onclick = () => {
         state.profile.height = Number(document.getElementById("p-height").value) || 183;
         state.profile.weight = Number(document.getElementById("p-weight").value) || 85.1;
         state.profile.cadenceMin = Number(document.getElementById("p-cadence").value) || 165;
-        state.profile.zones.vt1 = document.getElementById("z-vt1").value.trim() || "141-148";
-        state.profile.zones.z2 = document.getElementById("z-z2").value.trim() || "148-155";
-        state.profile.zones.tempo = document.getElementById("z-tempo").value.trim() || "158-164";
-        state.profile.zones.vt2 = document.getElementById("z-vt2").value.trim() || "165-168";
-        state.profile.zones.vo2 = document.getElementById("z-vo2").value.trim() || "187";
+        state.profile.zones.vt1 = document.getElementById("z-vt1").value.trim();
+        state.profile.zones.z2 = document.getElementById("z-z2").value.trim();
+        state.profile.zones.tempo = document.getElementById("z-tempo").value.trim();
+        state.profile.zones.vt2 = document.getElementById("z-vt2").value.trim();
+        state.profile.zones.vo2 = document.getElementById("z-vo2").value.trim();
         state.profile.notes = document.getElementById("p-notes").value.trim();
         const kVal = document.getElementById("k-gemini").value.trim();
         if (kVal) state.profile.geminiKey = kVal;
-        cachedDiscoveredModels = null;
         persistState();
         renderHeader();
-        renderWeek();
         updateApiKeyPreviewBadge();
-        showToast("Ficha guardada ✓");
+        showToast("Ficha guardada");
       };
 
       document.getElementById("toggle-keys-panel").onclick = () => {
@@ -1986,41 +1913,54 @@ Reglas:
       };
 
       document.getElementById("test-api-key-btn").onclick = async () => {
+        const inp = document.getElementById("k-gemini");
         const fb = document.getElementById("api-key-feedback");
-        fb.textContent = "Probando conexión y modelos disponibles...";
-        cachedDiscoveredModels = null;
-        const reply = await callGemini("Responde únicamente con la palabra: OK", [], false);
-        if (reply) {
-          fb.textContent = `Conexión verificada correctamente (${reply.trim()}).`;
-          fb.className = "mt-1.5 text-[11px] font-bold text-emerald-700";
-        } else {
-          fb.textContent = `No se pudo conectar: ${lastGeminiErrorDetail}`;
-          fb.className = "mt-1.5 text-[11px] font-bold text-red-600";
+        const stBadge = document.getElementById("api-key-status-badge");
+        const newKey = inp.value.trim();
+        if (newKey) {
+          state.profile.geminiKey = newKey;
+          cachedDiscoveredModels = null;
+          persistState();
+          updateApiKeyPreviewBadge();
+        }
+        fb.textContent = "Verificando conexión con Gemini...";
+        try {
+          const reply = await callGemini("Responde únicamente: OK", [], false);
+          stBadge.textContent = "Conectada ✓";
+          stBadge.className = "rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800";
+          fb.textContent = `Conexión verificada (${reply.slice(0, 20)}).`;
+        } catch (err) {
+          stBadge.textContent = "Error";
+          stBadge.className = "rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700";
+          fb.textContent = err.message;
         }
       };
 
-      // Swipe horizontal en Semana y Comidas
-      let touchStartX = 0;
-      const attachSwipe = (elId, onLeft, onRight) => {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        el.addEventListener("touchstart", (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
-        el.addEventListener("touchend", (e) => {
-          const diff = e.changedTouches[0].screenX - touchStartX;
-          if (Math.abs(diff) > 55) {
-            if (diff < 0) onLeft();
-            else onRight();
-          }
-        }, { passive: true });
-      };
       attachSwipe("swipe-week-area", () => document.getElementById("next-week").click(), () => document.getElementById("prev-week").click());
       attachSwipe("meals-swipe-area", () => document.getElementById("meals-next-week").click(), () => document.getElementById("meals-prev-week").click());
     }
 
-    bindGlobalControls();
-    renderHeader();
-    renderWeek();
-    updateApiKeyPreviewBadge();
+    function initApp() {
+      try {
+        bindGlobalControls();
+        renderHeader();
+        renderWeek();
+        updateApiKeyPreviewBadge();
+      } catch (err) {
+        localStorage.removeItem(STORAGE_KEY);
+        state = createInitialState();
+        bindGlobalControls();
+        renderHeader();
+        renderWeek();
+        updateApiKeyPreviewBadge();
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initApp);
+    } else {
+      initApp();
+    }
   </script>
 </body>
 </html>
