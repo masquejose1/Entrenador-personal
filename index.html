@@ -29,7 +29,7 @@
 </head>
 <body class="bg-[#f7f7fa] text-slate-900">
 
-  <!-- CABECERA ESTILO STRAVA (ACOTADA BAJO BARRA DE ESTADO IPHONE) -->
+  <!-- CABECERA ESTILO STRAVA -->
   <header class="safe-top-header sticky top-0 z-30 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-xs">
     <div class="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
       <div class="flex items-center gap-2.5 min-w-0">
@@ -109,7 +109,7 @@
           </div>
 
           <div class="space-y-2">
-            <textarea id="ai-adapt-input" rows="2" placeholder="Cuéntame tus sensaciones o disponibilidad (ej: ligera sobrecarga en rodilla, piernas cargadas, pasar tirada al domingo, solo 40 min el jueves...)" class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs focus:border-[#fc4c02] focus:outline-hidden"></textarea>
+            <textarea id="ai-adapt-input" rows="2" placeholder="Cuéntame tus sensaciones o disponibilidad (ej: ligera molestia en rodilla, piernas cargadas, pasar tirada al domingo, solo 40 min el jueves...)" class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 text-xs focus:border-[#fc4c02] focus:outline-hidden"></textarea>
             <button id="ai-adapt-run" class="rounded-xl bg-[#fc4c02] px-3.5 py-2 text-xs font-extrabold text-white shadow-2xs hover:bg-[#e04300]">
               Adaptar plan según sensaciones (IA)
             </button>
@@ -326,7 +326,6 @@
     </div>
 
     <div class="mx-auto w-full max-w-xl px-4 py-4 space-y-3 pb-12">
-      <!-- CABECERA ACTIVIDAD -->
       <div class="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-2xs space-y-2.5">
         <div class="flex items-start justify-between gap-2">
           <div>
@@ -338,7 +337,6 @@
         <div id="rd-targets" class="flex flex-wrap gap-1.5 pt-0.5"></div>
       </div>
 
-      <!-- SUBIDA DE CAPTURAS GARMIN -->
       <div class="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-2xs space-y-2.5">
         <div class="flex items-center justify-between gap-2">
           <div>
@@ -356,7 +354,6 @@
         </div>
       </div>
 
-      <!-- MÉTRICAS PRINCIPALES ESTILO STRAVA -->
       <div id="rd-metrics-card" class="hidden rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-2xs space-y-3">
         <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           <div class="rounded-xl bg-[#f7f7fa] p-3 border border-slate-100">
@@ -381,7 +378,6 @@
           </div>
         </div>
 
-        <!-- RESUMEN TÉCNICO -->
         <div class="rounded-xl border border-slate-100 bg-[#f7f7fa] p-3 space-y-1.5">
           <div class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Diagnóstico técnico</div>
           <p id="rd-summary-text" class="text-xs font-semibold text-slate-800 leading-relaxed"></p>
@@ -389,7 +385,6 @@
         </div>
       </div>
 
-      <!-- PARCIALES: SERIES O KILÓMETRO A KILÓMETRO -->
       <div id="rd-splits-card" class="hidden rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-2xs space-y-2.5">
         <div class="flex items-center justify-between">
           <h3 id="rd-splits-title" class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Parciales</h3>
@@ -430,7 +425,7 @@
   <!-- TOAST -->
   <div id="toast-box" class="fixed bottom-20 left-1/2 z-50 hidden -translate-x-1/2 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-lg"></div>
 
-  <!-- BARRA INFERIOR DE NAVEGACIÓN (4 ICONOS SVG) -->
+  <!-- BARRA INFERIOR DE NAVEGACIÓN (4 ICONOS SVG ORIGINALES) -->
   <nav class="safe-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-[#e2e8f0] bg-white/95 backdrop-blur-xs">
     <div class="mx-auto grid max-w-xl grid-cols-4">
       <button id="nav-semana" aria-label="Semana" class="flex items-center justify-center border-t-2 border-[#fc4c02] pt-3 pb-1 text-[#fc4c02]">
@@ -492,6 +487,30 @@
       box.classList.remove("hidden");
       clearTimeout(window.__toastTimer);
       window.__toastTimer = setTimeout(() => box.classList.add("hidden"), 2800);
+    }
+
+    /* ICONOS ORIGINALES POR DISCIPLINA (ZAPATILLA, MANCUERNA Y LUNA) */
+    function getSessionIconSvg(type) {
+      if (type === "run") {
+        return `<svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M3 17h18v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2z"></path>
+          <path d="M4 17l1.5-6.5c.3-1.2 1.4-2 2.6-2h1.4l2.5 2.5h4.5c1.9 0 3.5 1.6 3.5 3.5V17"></path>
+          <path d="M11 11l1.5-2"></path>
+          <path d="M13.5 12.5l1.5-2"></path>
+        </svg>`;
+      }
+      if (type === "gym") {
+        return `<svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M6.5 6.5v11"></path>
+          <path d="M17.5 6.5v11"></path>
+          <path d="M4 8.5v7"></path>
+          <path d="M20 8.5v7"></path>
+          <line x1="6.5" y1="12" x2="17.5" y2="12"></line>
+        </svg>`;
+      }
+      return `<svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>`;
     }
 
     function cloneGymTemplate(templateType) {
@@ -748,7 +767,7 @@
           weeks: Array.isArray(parsed.weeks) && parsed.weeks.length === 15 ? parsed.weeks : base.weeks
         };
         merged.weeks.forEach((w, wIdx) => {
-          if (!Array.isArray(w.days) || w.days.length !== 7) {
+          if (!w || !Array.isArray(w.days) || w.days.length !== 7 || w.days.every(d => !Array.isArray(d.sessions) || d.sessions.length === 0)) {
             merged.weeks[wIdx] = base.weeks[wIdx];
           }
         });
@@ -770,252 +789,152 @@
       }
     }
 
-    // MOTOR DE CONEXIÓN GEMINI IA CON RESPALDO AUTOMÁTICO DE MODELOS Y AUTENTICACIÓN
-    let cachedDiscoveredModels = null;
-
-    async function discoverActiveGeminiModels(apiKey) {
-      if (cachedDiscoveredModels && cachedDiscoveredModels.length) return cachedDiscoveredModels;
-      const endpoints = [
-        { url: `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`, headers: {} },
-        { url: `https://generativelanguage.googleapis.com/v1beta/models`, headers: { "x-goog-api-key": apiKey } }
-      ];
-      for (const ep of endpoints) {
-        try {
-          const res = await fetch(ep.url, { headers: ep.headers });
-          if (!res.ok) continue;
-          const data = await res.json();
-          const models = (data.models || [])
-            .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
-            .map(m => m.name.replace(/^models\//, ""))
-            .filter(name => /gemini/i.test(name) && !/embedding|imagen|veo|aqa|tts/i.test(name));
-          if (models.length) {
-            cachedDiscoveredModels = models;
-            return models;
-          }
-        } catch {}
-      }
-      return [];
-    }
-
-    async function callGemini(promptText, imagesBase64 = [], requireJson = false) {
-      const apiKey = (state.profile.geminiKey || DEFAULT_API_KEY || "").trim();
-      if (!apiKey) throw new Error("Falta la clave de API de Gemini en Perfil.");
-
-      const discovered = await discoverActiveGeminiModels(apiKey);
-      const priorityList = [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-pro",
-        "gemini-pro-latest"
-      ];
-      const modelQueue = [...new Set([...priorityList, ...discovered])];
-
-      const parts = [{ text: promptText }];
-      for (const img of imagesBase64) {
-        parts.push({
-          inlineData: {
-            mimeType: img.mimeType || "image/jpeg",
-            data: img.data
-          }
-        });
-      }
-
-      const authModes = [
-        { buildUrl: (m) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`, extraHeaders: {} },
-        { buildUrl: (m) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, extraHeaders: { "x-goog-api-key": apiKey } }
-      ];
-
-      let lastErr = "No se pudo conectar con Gemini.";
-      for (const model of modelQueue) {
-        for (const auth of authModes) {
-          const bodyObj = {
-            contents: [{ role: "user", parts }],
-            generationConfig: { temperature: 0.35 }
-          };
-          if (requireJson) {
-            bodyObj.generationConfig.responseMimeType = "application/json";
-          }
-          try {
-            const res = await fetch(auth.buildUrl(model), {
-              method: "POST",
-              headers: { "Content-Type": "application/json", ...auth.extraHeaders },
-              body: JSON.stringify(bodyObj)
-            });
-            const rawText = await res.text();
-            let json = {};
-            try { json = JSON.parse(rawText); } catch {}
-            if (!res.ok) {
-              lastErr = `${model}: ${json?.error?.message || res.statusText}`;
-              continue;
-            }
-            const out = json?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("\n").trim();
-            if (out) {
-              return out;
-            }
-          } catch (err) {
-            lastErr = `${model}: ${err.message}`;
-          }
-        }
-      }
-      throw new Error(lastErr);
-    }
-
-    function extractJsonFromText(raw) {
-      const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
-      try {
-        return JSON.parse(cleaned);
-      } catch {
-        const start = cleaned.indexOf("{");
-        const end = cleaned.lastIndexOf("}");
-        if (start !== -1 && end !== -1 && end > start) {
-          return JSON.parse(cleaned.slice(start, end + 1));
-        }
-        const arrStart = cleaned.indexOf("[");
-        const arrEnd = cleaned.lastIndexOf("]");
-        if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
-          return JSON.parse(cleaned.slice(arrStart, arrEnd + 1));
-        }
-        throw new Error("Respuesta IA sin formato JSON válido.");
-      }
-    }
-
-    function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = String(reader.result || "");
-          const commaIdx = result.indexOf(",");
-          const base64 = commaIdx !== -1 ? result.slice(commaIdx + 1) : result;
-          resolve({ mimeType: file.type || "image/jpeg", data: base64 });
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
-
     function renderHeader() {
-      const activeGoal = state.goals.find(g => g.active) || state.goals[0];
+      const activeGoal = (state.goals || []).find(g => g.active) || state.goals[0];
       const goalEl = document.getElementById("header-goal");
       const statusEl = document.getElementById("header-status");
-      const z2El = document.getElementById("week-z2-pill");
       if (goalEl && activeGoal) goalEl.textContent = activeGoal.name;
       if (statusEl) {
         const wStr = String(state.profile.weight).replace(".", ",");
         statusEl.textContent = `${wStr} kg · Obj. 1:51:00–1:54:00 · Cadencia ≥ ${state.profile.cadenceMin} ppm`;
       }
-      if (z2El) z2El.textContent = `${state.profile.zones.z2} ppm`;
     }
 
     function renderWeek() {
-      const weekSelect = document.getElementById("week-select");
-      weekSelect.innerHTML = state.weeks.map((w, idx) =>
-        `<option value="${idx}" ${idx === state.currentWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`
-      ).join("");
-
       const week = state.weeks[state.currentWeekIdx];
-      document.getElementById("week-phase-badge").textContent = week.phase;
+      if (!week) return;
 
-      let totalActive = 0;
-      let totalDone = 0;
-      let runPlanMin = 0;
-      let runDoneMin = 0;
-      let gymPlanMin = 0;
-      let gymDoneMin = 0;
+      const weekSelect = document.getElementById("week-select");
+      if (weekSelect) {
+        weekSelect.innerHTML = state.weeks
+          .map((w, idx) => `<option value="${idx}" ${idx === state.currentWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`)
+          .join("");
+      }
 
-      week.days.forEach(d => {
+      const phaseBadge = document.getElementById("week-phase-badge");
+      if (phaseBadge) phaseBadge.textContent = week.phase;
+
+      let totalSessions = 0;
+      let doneSessions = 0;
+      let runPlan = 0;
+      let runDone = 0;
+      let gymPlan = 0;
+      let gymDone = 0;
+
+      week.days.forEach((d) => {
         if (d.off) return;
-        d.sessions.forEach(s => {
-          totalActive++;
-          const dur = Number(s.durationMin) || 0;
+        d.sessions.forEach((s) => {
+          totalSessions++;
+          if (s.status === "done") doneSessions++;
           if (s.type === "run") {
-            runPlanMin += dur;
-            if (s.status === "done") runDoneMin += dur;
-          } else {
-            gymPlanMin += dur;
-            if (s.status === "done") gymDoneMin += dur;
+            runPlan += Number(s.durationMin) || 0;
+            if (s.status === "done") runDone += Number(s.durationMin) || 0;
+          } else if (s.type === "gym") {
+            gymPlan += Number(s.durationMin) || 0;
+            if (s.status === "done") gymDone += Number(s.durationMin) || 0;
           }
-          if (s.status === "done") totalDone++;
         });
       });
 
-      document.getElementById("week-summary").textContent = `${totalDone}/${totalActive} sesiones`;
-      document.getElementById("week-run-progress-label").textContent = `${runDoneMin} / ${runPlanMin} min`;
-      document.getElementById("week-gym-progress-label").textContent = `${gymDoneMin} / ${gymPlanMin} min`;
-      const pct = totalActive > 0 ? Math.round((totalDone / totalActive) * 100) : 0;
-      document.getElementById("week-progress-bar").style.width = `${pct}%`;
+      const summaryEl = document.getElementById("week-summary");
+      if (summaryEl) summaryEl.textContent = `${doneSessions}/${totalSessions} sesiones`;
+
+      const runLbl = document.getElementById("week-run-progress-label");
+      if (runLbl) runLbl.textContent = `${runDone} / ${runPlan} min`;
+
+      const gymLbl = document.getElementById("week-gym-progress-label");
+      if (gymLbl) gymLbl.textContent = `${gymDone} / ${gymPlan} min`;
+
+      const z2Pill = document.getElementById("week-z2-pill");
+      if (z2Pill) z2Pill.textContent = `${state.profile.zones.z2} ppm`;
+
+      const pct = totalSessions > 0 ? Math.round((doneSessions / totalSessions) * 100) : 0;
+      const bar = document.getElementById("week-progress-bar");
+      if (bar) bar.style.width = `${pct}%`;
 
       const container = document.getElementById("days-container");
+      if (!container) return;
+
       container.innerHTML = week.days.map((day, dIdx) => {
         if (day.off || day.sessions.length === 0) {
           return `
-            <div class="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/70 px-3.5 py-3">
+            <div class="rounded-2xl border border-[#e2e8f0] bg-white/75 px-3.5 py-2.5 flex items-center justify-between gap-2">
               <div class="flex items-center gap-2.5">
                 <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-                  <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                  ${getSessionIconSvg("off")}
                 </div>
                 <div>
                   <div class="text-xs font-extrabold text-slate-500">${escapeHtml(day.dayName)}</div>
-                  <div class="text-[11px] font-medium text-slate-400">Descanso / OFF</div>
+                  <div class="text-[11px] font-medium text-slate-400">Descanso · OFF</div>
                 </div>
               </div>
-              <button type="button" data-day-menu="${dIdx}" class="rounded-lg px-2 py-1 text-sm font-black text-slate-400 hover:bg-slate-100 hover:text-slate-700">⋮</button>
+              <button data-day-menu="${dIdx}" class="rounded-lg px-2 py-1 text-sm font-black text-slate-400 hover:bg-slate-100 hover:text-slate-700">⋮</button>
             </div>
           `;
         }
 
-        return day.sessions.map((s, sIdx) => {
-          const isRun = s.type === "run";
+        const sessionsHtml = day.sessions.map((s, sIdx) => {
           const isDone = s.status === "done";
           const isFailed = s.status === "failed";
+          const isGym = s.type === "gym";
+          const isGymExpanded = isGym && expandedGymIds.has(s.id);
+
           const cardBg = isDone
-            ? "border-emerald-300 bg-emerald-50/70"
+            ? "border-emerald-200 bg-emerald-50/70"
             : isFailed
-              ? "border-red-200 bg-red-50/50"
+              ? "border-red-200 bg-red-50/60"
               : "border-[#e2e8f0] bg-white";
 
-          const iconSvg = isRun
-            ? `<svg class="h-4 w-4 text-[#fc4c02]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 16l4.5-4.5L12 14l4-6 4 4v6H4v-2z"></path></svg>`
-            : `<svg class="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M6.5 6.5h11M6.5 17.5h11M4 9v6M20 9v6M2 10.5v3M22 10.5v3"></path></svg>`;
+          const iconWrap = isDone
+            ? "bg-emerald-600 text-white"
+            : isGym
+              ? "bg-slate-900 text-white"
+              : "bg-orange-50 text-[#fc4c02]";
 
-          let gymHtml = "";
-          if (!isRun) {
-            const isGymOpen = expandedGymIds.has(s.id);
-            const exRows = (s.exercises || []).map((ex, exIdx) => `
-              <div class="rounded-xl border border-slate-200/80 bg-white/90 p-2 space-y-1.5">
-                <div class="flex items-center gap-1.5">
-                  <input type="checkbox" data-ex-toggle="${dIdx}:${sIdx}:${exIdx}" ${ex.done ? "checked" : ""} class="h-4 w-4 accent-emerald-600 rounded" />
-                  <input type="text" data-ex-field="${dIdx}:${sIdx}:${exIdx}:name" value="${escapeHtml(ex.name)}" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-[#f7f7fa] px-2 py-1 text-[11px] font-bold text-slate-800" />
-                  <button type="button" data-ex-del="${dIdx}:${sIdx}:${exIdx}" class="px-1.5 text-xs font-bold text-slate-400 hover:text-red-600">✕</button>
+          const badges = [];
+          if (s.durationMin) badges.push(`<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700">${s.durationMin} min</span>`);
+          if (s.targetHr && s.targetHr !== "-") badges.push(`<span class="rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-extrabold text-[#fc4c02]">${escapeHtml(s.targetHr)}</span>`);
+          if (s.targetPace && s.targetPace !== "-") badges.push(`<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">${escapeHtml(s.targetPace)}/km</span>`);
+          if (s.audit) badges.push(`<span class="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">Garmin ✓</span>`);
+          if (isGym) {
+            badges.push(`<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700">${s.exercises.length} ej. ${isGymExpanded ? "▴" : "▾"}</span>`);
+          }
+
+          let gymDrawerHtml = "";
+          if (isGym && isGymExpanded) {
+            const exRows = s.exercises.map((ex, eIdx) => `
+              <div class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2.5 space-y-1.5">
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" data-ex-check="${dIdx}:${sIdx}:${eIdx}" ${ex.done ? "checked" : ""} class="h-4 w-4 rounded accent-emerald-600" />
+                  <input type="text" data-ex-field="${dIdx}:${sIdx}:${eIdx}:name" value="${escapeHtml(ex.name)}" class="min-w-0 flex-1 rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold text-slate-800" />
+                  <button type="button" data-ex-del="${dIdx}:${sIdx}:${eIdx}" class="rounded-lg px-1.5 py-1 text-[11px] font-bold text-slate-400 hover:bg-red-50 hover:text-red-600">✕</button>
                 </div>
-                <div class="grid grid-cols-3 gap-1.5 pl-5">
-                  <div class="flex items-center gap-1 rounded-lg bg-[#f7f7fa] px-2 py-1 border border-slate-100">
-                    <span class="text-[10px] font-bold text-slate-400">Ser</span>
-                    <input type="number" data-ex-field="${dIdx}:${sIdx}:${exIdx}:sets" value="${escapeHtml(ex.sets)}" class="w-full bg-transparent text-right text-[11px] font-extrabold text-slate-800" />
+                <div class="grid grid-cols-3 gap-1.5 pl-6">
+                  <div>
+                    <label class="block text-[9px] font-extrabold uppercase text-slate-400">Series</label>
+                    <input type="number" data-ex-field="${dIdx}:${sIdx}:${eIdx}:sets" value="${escapeHtml(ex.sets)}" class="w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold" />
                   </div>
-                  <div class="flex items-center gap-1 rounded-lg bg-[#f7f7fa] px-2 py-1 border border-slate-100">
-                    <span class="text-[10px] font-bold text-slate-400">Rep</span>
-                    <input type="text" data-ex-field="${dIdx}:${sIdx}:${exIdx}:reps" value="${escapeHtml(ex.reps)}" class="w-full bg-transparent text-right text-[11px] font-extrabold text-slate-800" />
+                  <div>
+                    <label class="block text-[9px] font-extrabold uppercase text-slate-400">Reps / Tiempo</label>
+                    <input type="text" data-ex-field="${dIdx}:${sIdx}:${eIdx}:reps" value="${escapeHtml(ex.reps)}" class="w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold" />
                   </div>
-                  <div class="flex items-center gap-1 rounded-lg bg-[#f7f7fa] px-2 py-1 border border-slate-100">
-                    <span class="text-[10px] font-bold text-slate-400">Kg</span>
-                    <input type="number" step="0.5" data-ex-field="${dIdx}:${sIdx}:${exIdx}:weight" value="${escapeHtml(ex.weight)}" class="w-full bg-transparent text-right text-[11px] font-extrabold text-slate-800" />
+                  <div>
+                    <label class="block text-[9px] font-extrabold uppercase text-slate-400">Peso (kg)</label>
+                    <input type="number" step="0.5" data-ex-field="${dIdx}:${sIdx}:${eIdx}:weight" value="${escapeHtml(ex.weight)}" class="w-full rounded-lg border border-[#e2e8f0] bg-white px-2 py-1 text-xs font-bold" />
                   </div>
                 </div>
               </div>
             `).join("");
 
-            gymHtml = `
-              <div class="${isGymOpen ? "" : "hidden"} mt-2.5 space-y-1.5 border-t border-slate-200/70 pt-2.5">
-                ${exRows}
+            gymDrawerHtml = `
+              <div class="mt-2.5 space-y-2 border-t border-slate-200/70 pt-2.5">
+                <div class="text-[11px] font-medium text-slate-500">${escapeHtml(s.structure)}</div>
+                <div class="space-y-2">${exRows}</div>
                 <div class="flex items-center justify-between gap-2 pt-1">
-                  <button type="button" data-add-ex="${dIdx}:${sIdx}" class="rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50">+ Ejercicio</button>
-                  <label class="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50">
-                    <svg class="h-3.5 w-3.5 text-[#fc4c02]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                    <span>Rutina foto</span>
+                  <button type="button" data-ex-add="${dIdx}:${sIdx}" class="rounded-xl border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100">+ Ejercicio</button>
+                  <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-100">
+                    <svg class="h-3.5 w-3.5 text-[#fc4c02]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    <span>Subir rutina foto</span>
                     <input type="file" accept="image/*" data-gym-photo="${dIdx}:${sIdx}" class="hidden" />
                   </label>
                 </div>
@@ -1023,461 +942,881 @@
             `;
           }
 
-          const auditChip = s.audit
-            ? `<div class="mt-2 rounded-xl border border-emerald-200 bg-white/90 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700">
-                <span class="font-extrabold text-emerald-700">Garmin:</span> ${escapeHtml(s.audit.distanceKm || "-")} km · ${escapeHtml(s.audit.timeStr || "-")} · ${escapeHtml(s.audit.avgPace || "-")}/km · ${escapeHtml(s.audit.avgHr || "-")} ppm · Cad ${escapeHtml(s.audit.avgCadence || "-")}
-              </div>`
-            : "";
-
-          const gymCountBadge = !isRun
-            ? `<span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">${(s.exercises || []).length} ej. ${expandedGymIds.has(s.id) ? "▴" : "▾"}</span>`
-            : "";
-
           return `
             <div class="rounded-2xl border ${cardBg} p-3.5 shadow-2xs transition-colors">
               <div class="flex items-start justify-between gap-2.5">
-                <div class="flex items-start gap-2.5 min-w-0 flex-1 cursor-pointer" ${isRun ? `data-open-run="${dIdx}:${sIdx}"` : `data-toggle-gym="${dIdx}:${sIdx}"`}>
-                  <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${isRun ? "bg-orange-50" : "bg-slate-100"}">
-                    ${iconSvg}
+                <div data-session-open="${dIdx}:${sIdx}" class="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5">
+                  <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${iconWrap}">
+                    ${getSessionIconSvg(s.type)}
                   </div>
                   <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-1.5">
+                    <div class="flex items-center gap-1.5">
                       <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">${escapeHtml(day.dayName)}</span>
-                      <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-extrabold text-slate-700">${escapeHtml(s.durationMin)} min</span>
-                      ${s.targetHr && s.targetHr !== "-" ? `<span class="rounded-md bg-orange-50 px-1.5 py-0.5 text-[10px] font-extrabold text-[#fc4c02]">${escapeHtml(s.targetHr)}</span>` : ""}
-                      ${gymCountBadge}
+                      <span class="text-[10px] font-bold text-slate-300">•</span>
+                      <span class="text-[11px] font-bold text-slate-500">${isGym ? "Gimnasio" : "Carrera"}</span>
                     </div>
-                    <h4 class="mt-0.5 text-xs font-black text-slate-900">${escapeHtml(s.title)}</h4>
-                    <p class="mt-0.5 text-[11px] text-slate-500">${escapeHtml(s.structure)}</p>
-                    ${isFailed && s.failReason ? `<p class="mt-1 text-[11px] font-bold text-red-600">Fallida: ${escapeHtml(s.failReason)}</p>` : ""}
-                    ${auditChip}
+                    <h4 class="mt-0.5 text-sm font-black text-slate-900 leading-snug">${escapeHtml(s.title)}</h4>
+                    <div class="mt-1.5 flex flex-wrap gap-1.5">${badges.join("")}</div>
+                    ${isFailed && s.failReason ? `<p class="mt-1 text-[11px] font-semibold text-red-600">Motivo: ${escapeHtml(s.failReason)}</p>` : ""}
                   </div>
                 </div>
-                <div class="flex items-center gap-1.5 shrink-0">
-                  <button type="button" data-toggle-session="${dIdx}:${sIdx}" aria-label="Marcar completado" class="flex h-7 w-7 items-center justify-center rounded-lg border ${isDone ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent hover:border-[#fc4c02]"} font-black text-xs">✓</button>
-                  <button type="button" data-session-menu="${dIdx}:${sIdx}" class="rounded-lg px-1.5 py-1 text-sm font-black text-slate-500 hover:bg-slate-100">⋮</button>
+
+                <div class="flex shrink-0 items-center gap-1.5">
+                  <button type="button" data-session-check="${dIdx}:${sIdx}" aria-label="Completar sesión" class="flex h-7 w-7 items-center justify-center rounded-lg border-2 ${isDone ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white text-transparent hover:border-[#fc4c02]"}">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </button>
+                  <button type="button" data-day-menu="${dIdx}:${sIdx}" class="rounded-lg px-1.5 py-1 text-sm font-black text-slate-400 hover:bg-slate-100 hover:text-slate-700">⋮</button>
                 </div>
               </div>
-              ${gymHtml}
+              ${gymDrawerHtml}
             </div>
           `;
         }).join("");
+
+        return `<div class="space-y-2">${sessionsHtml}</div>`;
       }).join("");
 
-      bindWeekEvents();
+      bindWeekCardEvents();
     }
 
-    function propagateGymRoutine(fromWeekIdx, dayIndex, exercises) {
-      for (let i = fromWeekIdx + 1; i < state.weeks.length; i++) {
-        const day = state.weeks[i].days[dayIndex];
+    function propagateGymRoutine(dayIndex, exercises) {
+      for (let w = state.currentWeekIdx + 1; w < state.weeks.length; w++) {
+        const day = state.weeks[w].days[dayIndex];
         if (!day || day.off) continue;
-        const gymSes = day.sessions.find(s => s.type === "gym" && s.status === "pending");
-        if (gymSes) {
-          gymSes.exercises = exercises.map(e => ({ ...e, done: false }));
+        const gymSess = day.sessions.find(s => s.type === "gym" && s.status === "pending");
+        if (gymSess) {
+          gymSess.exercises = exercises.map((ex, idx) => ({
+            ...ex,
+            id: `w${w + 1}-d${dayIndex}-ex${idx}-${Date.now()}`,
+            done: false
+          }));
         }
       }
     }
 
-    function openModal(title, bodyHtml, onConfirm) {
+    function bindWeekCardEvents() {
+      const container = document.getElementById("days-container");
+      if (!container) return;
+
+      container.querySelectorAll("[data-session-open]").forEach((el) => {
+        el.onclick = () => {
+          const [dIdx, sIdx] = el.getAttribute("data-session-open").split(":").map(Number);
+          const session = state.weeks[state.currentWeekIdx].days[dIdx]?.sessions[sIdx];
+          if (!session) return;
+          if (session.type === "gym") {
+            if (expandedGymIds.has(session.id)) expandedGymIds.delete(session.id);
+            else expandedGymIds.add(session.id);
+            renderWeek();
+          } else {
+            openRunDetail(dIdx, sIdx);
+          }
+        };
+      });
+
+      container.querySelectorAll("[data-session-check]").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const [dIdx, sIdx] = btn.getAttribute("data-session-check").split(":").map(Number);
+          const session = state.weeks[state.currentWeekIdx].days[dIdx]?.sessions[sIdx];
+          if (!session) return;
+          session.status = session.status === "done" ? "pending" : "done";
+          persistState();
+          renderWeek();
+        };
+      });
+
+      container.querySelectorAll("[data-day-menu]").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const parts = btn.getAttribute("data-day-menu").split(":").map(Number);
+          openDayContextMenu(parts[0], parts[1] ?? 0);
+        };
+      });
+
+      container.querySelectorAll("[data-ex-check]").forEach((chk) => {
+        chk.onchange = () => {
+          const [dIdx, sIdx, eIdx] = chk.getAttribute("data-ex-check").split(":").map(Number);
+          const session = state.weeks[state.currentWeekIdx].days[dIdx]?.sessions[sIdx];
+          if (!session) return;
+          session.exercises[eIdx].done = chk.checked;
+          if (session.exercises.length > 0 && session.exercises.every(x => x.done)) {
+            session.status = "done";
+          }
+          persistState();
+          renderWeek();
+        };
+      });
+
+      container.querySelectorAll("[data-ex-field]").forEach((inp) => {
+        inp.onchange = () => {
+          const [dIdx, sIdx, eIdx, field] = inp.getAttribute("data-ex-field").split(":");
+          const session = state.weeks[state.currentWeekIdx].days[Number(dIdx)]?.sessions[Number(sIdx)];
+          if (!session) return;
+          const val = field === "sets" || field === "weight" ? Number(inp.value) : inp.value;
+          session.exercises[Number(eIdx)][field] = val;
+          propagateGymRoutine(Number(dIdx), session.exercises);
+          persistState();
+          showToast("Rutina actualizada y propagada");
+        };
+      });
+
+      container.querySelectorAll("[data-ex-del]").forEach((btn) => {
+        btn.onclick = () => {
+          const [dIdx, sIdx, eIdx] = btn.getAttribute("data-ex-del").split(":").map(Number);
+          const session = state.weeks[state.currentWeekIdx].days[dIdx]?.sessions[sIdx];
+          if (!session) return;
+          session.exercises.splice(eIdx, 1);
+          propagateGymRoutine(dIdx, session.exercises);
+          persistState();
+          renderWeek();
+        };
+      });
+
+      container.querySelectorAll("[data-ex-add]").forEach((btn) => {
+        btn.onclick = () => {
+          const [dIdx, sIdx] = btn.getAttribute("data-ex-add").split(":").map(Number);
+          const session = state.weeks[state.currentWeekIdx].days[dIdx]?.sessions[sIdx];
+          if (!session) return;
+          session.exercises.push({
+            id: `ex-${Date.now()}`,
+            name: "Nuevo ejercicio",
+            sets: 3,
+            reps: "10",
+            weight: 0,
+            done: false
+          });
+          propagateGymRoutine(dIdx, session.exercises);
+          persistState();
+          renderWeek();
+        };
+      });
+
+      container.querySelectorAll("[data-gym-photo]").forEach((inp) => {
+        inp.onchange = async () => {
+          const file = inp.files?.[0];
+          if (!file) return;
+          const [dIdx, sIdx] = inp.getAttribute("data-gym-photo").split(":").map(Number);
+          await importGymFromPhoto(dIdx, sIdx, file);
+        };
+      });
+    }
+
+    function openModal(title, bodyHtml, onConfirm, confirmLabel = "Aceptar") {
       const overlay = document.getElementById("modal-overlay");
       document.getElementById("modal-title").textContent = title;
       document.getElementById("modal-body").innerHTML = bodyHtml;
+      const confirmBtn = document.getElementById("modal-confirm");
+      confirmBtn.textContent = confirmLabel;
       overlay.classList.remove("hidden");
       overlay.classList.add("flex");
+
       const close = () => {
         overlay.classList.add("hidden");
         overlay.classList.remove("flex");
       };
       document.getElementById("modal-close").onclick = close;
       document.getElementById("modal-cancel").onclick = close;
-      document.getElementById("modal-confirm").onclick = () => {
-        if (onConfirm) onConfirm();
-        close();
+      confirmBtn.onclick = () => {
+        if (onConfirm() !== false) close();
       };
     }
 
-    function bindWeekEvents() {
+    function openDayContextMenu(dIdx, sIdx) {
       const week = state.weeks[state.currentWeekIdx];
+      const day = week.days[dIdx];
+      const session = day.sessions[sIdx];
 
-      document.querySelectorAll("[data-toggle-session]").forEach(btn => {
-        btn.onclick = () => {
-          const [dIdx, sIdx] = btn.dataset.toggleSession.split(":").map(Number);
-          const s = week.days[dIdx].sessions[sIdx];
-          s.status = s.status === "done" ? "pending" : "done";
-          persistState();
-          renderWeek();
-        };
-      });
-
-      document.querySelectorAll("[data-open-run]").forEach(el => {
-        el.onclick = () => {
-          const [dIdx, sIdx] = el.dataset.openRun.split(":").map(Number);
-          openRunDetail(state.currentWeekIdx, dIdx, sIdx);
-        };
-      });
-
-      document.querySelectorAll("[data-toggle-gym]").forEach(el => {
-        el.onclick = () => {
-          const [dIdx, sIdx] = el.dataset.toggleGym.split(":").map(Number);
-          const ses = week.days[dIdx].sessions[sIdx];
-          if (expandedGymIds.has(ses.id)) expandedGymIds.delete(ses.id);
-          else expandedGymIds.add(ses.id);
-          renderWeek();
-        };
-      });
-
-      document.querySelectorAll("[data-ex-toggle]").forEach(chk => {
-        chk.onchange = () => {
-          const [dIdx, sIdx, exIdx] = chk.dataset.exToggle.split(":").map(Number);
-          week.days[dIdx].sessions[sIdx].exercises[exIdx].done = chk.checked;
-          persistState();
-        };
-      });
-
-      document.querySelectorAll("[data-ex-field]").forEach(inp => {
-        inp.onchange = () => {
-          const [dIdx, sIdx, exIdx, field] = inp.dataset.exField.split(":");
-          const ses = week.days[Number(dIdx)].sessions[Number(sIdx)];
-          const ex = ses.exercises[Number(exIdx)];
-          ex[field] = (field === "sets" || field === "weight") ? Number(inp.value) : inp.value;
-          propagateGymRoutine(state.currentWeekIdx, Number(dIdx), ses.exercises);
-          persistState();
-          showToast("Rutina actualizada y propagada");
-        };
-      });
-
-      document.querySelectorAll("[data-ex-del]").forEach(btn => {
-        btn.onclick = () => {
-          const [dIdx, sIdx, exIdx] = btn.dataset.exDel.split(":").map(Number);
-          const ses = week.days[dIdx].sessions[sIdx];
-          ses.exercises.splice(exIdx, 1);
-          propagateGymRoutine(state.currentWeekIdx, dIdx, ses.exercises);
-          persistState();
-          renderWeek();
-        };
-      });
-
-      document.querySelectorAll("[data-add-ex]").forEach(btn => {
-        btn.onclick = () => {
-          const [dIdx, sIdx] = btn.dataset.addEx.split(":").map(Number);
-          const ses = week.days[dIdx].sessions[sIdx];
-          ses.exercises.push({ id: `ex-${Date.now()}`, name: "Nuevo ejercicio", sets: 3, reps: "10", weight: 10, done: false });
-          propagateGymRoutine(state.currentWeekIdx, dIdx, ses.exercises);
-          persistState();
-          renderWeek();
-        };
-      });
-
-      document.querySelectorAll("[data-gym-photo]").forEach(inp => {
-        inp.onchange = async () => {
-          const file = inp.files?.[0];
-          if (!file) return;
-          const [dIdx, sIdx] = inp.dataset.gymPhoto.split(":").map(Number);
-          showToast("Leyendo rutina con IA...");
-          try {
-            const img = await fileToBase64(file);
-            const raw = await callGemini(
-              `Extrae los ejercicios de gimnasio de esta imagen en JSON puro con formato: {"exercises":[{"name":"Nombre ejercicio","sets":3,"reps":"10","weight":0}]}. Sin texto extra.`,
-              [img],
-              true
-            );
-            const parsed = extractJsonFromText(raw);
-            if (Array.isArray(parsed.exercises) && parsed.exercises.length) {
-              const ses = week.days[dIdx].sessions[sIdx];
-              ses.exercises = parsed.exercises.map((e, i) => ({
-                id: `gp-${Date.now()}-${i}`,
-                name: e.name || "Ejercicio",
-                sets: Number(e.sets) || 3,
-                reps: String(e.reps || "10"),
-                weight: Number(e.weight) || 0,
-                done: false
-              }));
-              propagateGymRoutine(state.currentWeekIdx, dIdx, ses.exercises);
-              persistState();
-              renderWeek();
-              showToast("Rutina importada de foto");
-            }
-          } catch (err) {
-            showToast("Error leyendo rutina: " + err.message);
-          }
-        };
-      });
-
-      document.querySelectorAll("[data-day-menu]").forEach(btn => {
-        btn.onclick = () => {
-          const dIdx = Number(btn.dataset.dayMenu);
-          const day = week.days[dIdx];
-          openModal(`${day.dayName} · Activar sesión`, `
-            <div class="space-y-2 text-xs">
-              <label class="block font-bold text-slate-700">Tipo de sesión</label>
-              <select id="m-new-type" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold">
-                <option value="run">Carrera</option>
-                <option value="gym">Gimnasio</option>
-              </select>
-              <input id="m-new-title" type="text" value="Rodaje suave Z2" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
-              <input id="m-new-dur" type="number" value="40" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
-            </div>
-          `, () => {
-            const type = document.getElementById("m-new-type").value;
-            const title = document.getElementById("m-new-title").value || "Sesión extra";
-            const dur = Number(document.getElementById("m-new-dur").value) || 40;
+      if (day.off || !session) {
+        openModal(
+          `${day.dayName} · Día en OFF`,
+          `<p class="text-xs text-slate-600">Este día está marcado como descanso. ¿Quieres activar una sesión?</p>
+           <select id="m-act-type" class="w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 text-xs font-bold">
+             <option value="run">Carrera suave Z2 (35 min)</option>
+             <option value="gym">Gimnasio / Core (40 min)</option>
+           </select>`,
+          () => {
+            const t = document.getElementById("m-act-type").value;
             day.off = false;
-            day.sessions = [makeSession(`s-${Date.now()}`, type, title, dur, type === "run" ? "148-155 ppm" : "-", "-", title, type === "gym" ? "upper" : null)];
+            day.sessions = [
+              t === "run"
+                ? makeSession(`s-${Date.now()}`, "run", "Rodaje Z2 extra", 35, "148-155 ppm", "5:50-6:15", "10' entrada progresiva + 25' Zona 2")
+                : makeSession(`s-${Date.now()}`, "gym", "Gimnasio / Core", 40, "-", "-", "Trabajo complementario controlado", "core")
+            ];
             persistState();
             renderWeek();
-          });
-        };
-      });
+          },
+          "Activar sesión"
+        );
+        return;
+      }
 
-      document.querySelectorAll("[data-session-menu]").forEach(btn => {
-        btn.onclick = () => {
-          const [dIdx, sIdx] = btn.dataset.sessionMenu.split(":").map(Number);
-          const day = week.days[dIdx];
-          const s = day.sessions[sIdx];
-          const dayOptions = week.days.map((d, idx) => `<option value="${idx}" ${idx === dIdx ? "selected" : ""}>${d.dayName}</option>`).join("");
-          openModal(`${day.dayName} · ${s.title}`, `
-            <div class="space-y-2 text-xs">
-              <label class="block font-bold text-slate-700">Título / Series</label>
-              <input id="m-edit-title" type="text" value="${escapeHtml(s.title)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block font-bold text-slate-700">Duración (min)</label>
-                  <input id="m-edit-dur" type="number" value="${escapeHtml(s.durationMin)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
-                </div>
-                <div>
-                  <label class="block font-bold text-slate-700">Pulso objetivo</label>
-                  <input id="m-edit-hr" type="text" value="${escapeHtml(s.targetHr)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold" />
-                </div>
-              </div>
-              <label class="block font-bold text-slate-700">Estructura</label>
-              <input id="m-edit-str" type="text" value="${escapeHtml(s.structure)}" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2" />
-              <div class="grid grid-cols-2 gap-2 pt-1">
-                <div>
-                  <label class="block font-bold text-slate-700">Mover / Permutar a</label>
-                  <select id="m-swap-day" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold">${dayOptions}</select>
-                </div>
-                <div>
-                  <label class="block font-bold text-slate-700">Estado rápido</label>
-                  <select id="m-status-sel" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2 font-bold">
-                    <option value="pending" ${s.status === "pending" ? "selected" : ""}>Pendiente</option>
-                    <option value="done" ${s.status === "done" ? "selected" : ""}>Completada</option>
-                    <option value="failed" ${s.status === "failed" ? "selected" : ""}>Fallida</option>
-                    <option value="off">Pasar día a OFF</option>
-                    <option value="double">+ Añadir doble sesión</option>
-                  </select>
-                </div>
-              </div>
-              <input id="m-fail-reason" type="text" value="${escapeHtml(s.failReason || "")}" placeholder="Motivo si fallida (opcional)" class="w-full rounded-xl border border-slate-200 bg-[#f7f7fa] p-2" />
+      openModal(
+        `${day.dayName} · ${session.title}`,
+        `<div class="space-y-2 text-xs">
+          <div>
+            <label class="font-bold text-slate-500">Título / Series</label>
+            <input id="m-s-title" type="text" value="${escapeHtml(session.title)}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 font-bold" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-bold text-slate-500">Duración (min)</label>
+              <input id="m-s-dur" type="number" value="${session.durationMin}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 font-bold" />
             </div>
-          `, () => {
-            s.title = document.getElementById("m-edit-title").value;
-            s.durationMin = Number(document.getElementById("m-edit-dur").value) || s.durationMin;
-            s.targetHr = document.getElementById("m-edit-hr").value;
-            s.structure = document.getElementById("m-edit-str").value;
-            s.failReason = document.getElementById("m-fail-reason").value;
+            <div>
+              <label class="font-bold text-slate-500">Pulso objetivo</label>
+              <input id="m-s-hr" type="text" value="${escapeHtml(session.targetHr)}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2 font-bold" />
+            </div>
+          </div>
+          <div>
+            <label class="font-bold text-slate-500">Estructura</label>
+            <input id="m-s-str" type="text" value="${escapeHtml(session.structure)}" class="mt-1 w-full rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] p-2" />
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button type="button" id="m-btn-add2" class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] py-2 font-bold text-slate-700">+ Doble sesión</button>
+            <button type="button" id="m-btn-off" class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] py-2 font-bold text-slate-700">Pasar a OFF</button>
+            <button type="button" id="m-btn-fail" class="rounded-xl border border-red-200 bg-red-50 py-2 font-bold text-red-700">Marcar fallida</button>
+            <select id="m-swap-day" class="rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-2 py-2 font-bold text-slate-700">
+              <option value="">Permutar con...</option>
+              ${week.days.map((wd, idx) => idx !== dIdx ? `<option value="${idx}">${wd.dayName}</option>` : "").join("")}
+            </select>
+          </div>
+        </div>`,
+        () => {
+          session.title = document.getElementById("m-s-title").value.trim() || session.title;
+          session.durationMin = Number(document.getElementById("m-s-dur").value) || session.durationMin;
+          session.targetHr = document.getElementById("m-s-hr").value.trim() || session.targetHr;
+          session.structure = document.getElementById("m-s-str").value.trim() || session.structure;
+          const swapVal = document.getElementById("m-swap-day").value;
+          if (swapVal !== "") {
+            const targetIdx = Number(swapVal);
+            const tmpSessions = week.days[dIdx].sessions;
+            const tmpOff = week.days[dIdx].off;
+            week.days[dIdx].sessions = week.days[targetIdx].sessions;
+            week.days[dIdx].off = week.days[targetIdx].off;
+            week.days[targetIdx].sessions = tmpSessions;
+            week.days[targetIdx].off = tmpOff;
+          }
+          persistState();
+          renderWeek();
+        },
+        "Guardar"
+      );
 
-            const st = document.getElementById("m-status-sel").value;
-            const targetDayIdx = Number(document.getElementById("m-swap-day").value);
-
-            if (st === "off") {
-              day.off = true;
-              day.sessions = [];
-            } else if (st === "double") {
-              day.sessions.push(makeSession(`dbl-${Date.now()}`, "gym", "Core / Movilidad extra", 25, "-", "-", "Sesión complementaria", "core"));
-            } else {
-              s.status = st;
-            }
-
-            if (targetDayIdx !== dIdx && st !== "off") {
-              const targetDay = week.days[targetDayIdx];
-              const tmp = targetDay.sessions;
-              const tmpOff = targetDay.off;
-              targetDay.sessions = day.sessions;
-              targetDay.off = false;
-              day.sessions = tmp;
-              day.off = tmpOff || day.sessions.length === 0;
-            }
-
-            persistState();
-            renderWeek();
-          });
-        };
-      });
+      document.getElementById("m-btn-add2").onclick = () => {
+        day.sessions.push(makeSession(`s-${Date.now()}`, "gym", "Core / Movilidad extra", 25, "-", "-", "Sesión complementaria", "core"));
+        persistState();
+        renderWeek();
+        document.getElementById("modal-close").click();
+      };
+      document.getElementById("m-btn-off").onclick = () => {
+        day.sessions.splice(sIdx, 1);
+        if (day.sessions.length === 0) day.off = true;
+        persistState();
+        renderWeek();
+        document.getElementById("modal-close").click();
+      };
+      document.getElementById("m-btn-fail").onclick = () => {
+        session.status = "failed";
+        session.failReason = prompt("Motivo de sesión fallida (fatiga, tiempo, molestia...):") || "Sin motivo especificado";
+        persistState();
+        renderWeek();
+        document.getElementById("modal-close").click();
+      };
     }
 
-    function openRunDetail(weekIdx, dayIdx, sesIdx) {
-      activeDetailRef = { weekIdx, dayIdx, sesIdx };
-      const week = state.weeks[weekIdx];
-      const day = week.days[dayIdx];
-      const ses = day.sessions[sesIdx];
+    function openRunDetail(dIdx, sIdx) {
+      const week = state.weeks[state.currentWeekIdx];
+      const day = week.days[dIdx];
+      const s = day.sessions[sIdx];
+      if (!s) return;
+      activeDetailRef = { dIdx, sIdx };
 
-      document.getElementById("rd-day-badge").textContent = `${week.label.split("(")[0].trim()} · ${day.dayName}`;
+      const modal = document.getElementById("run-detail-modal");
+      document.getElementById("rd-day-badge").textContent = `${week.label} · ${day.dayName}`;
       document.getElementById("rd-type-tag").textContent = "CARRERA";
-      document.getElementById("rd-title").textContent = ses.title;
-      document.getElementById("rd-structure").textContent = ses.structure;
+      document.getElementById("rd-title").textContent = s.title;
+      document.getElementById("rd-structure").textContent = s.structure;
 
-      const targetsEl = document.getElementById("rd-targets");
-      targetsEl.innerHTML = `
-        <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-700">Duración: ${escapeHtml(ses.durationMin)} min</span>
-        ${ses.targetHr ? `<span class="rounded-lg bg-orange-50 px-2.5 py-1 text-[11px] font-extrabold text-[#fc4c02]">Pulso: ${escapeHtml(ses.targetHr)}</span>` : ""}
-        ${ses.targetPace ? `<span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-700">Ritmo: ${escapeHtml(ses.targetPace)}/km</span>` : ""}
-      `;
+      const targets = [
+        `<span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-700">Duración: ${s.durationMin} min</span>`,
+        `<span class="rounded-lg bg-orange-50 px-2.5 py-1 text-[11px] font-extrabold text-[#fc4c02]">Pulso: ${escapeHtml(s.targetHr)}</span>`,
+        `<span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">Ritmo: ${escapeHtml(s.targetPace)}/km</span>`
+      ];
+      document.getElementById("rd-targets").innerHTML = targets.join("");
 
       const toggleBtn = document.getElementById("rd-toggle-done");
-      const syncDoneBtn = () => {
-        const done = ses.status === "done";
-        toggleBtn.textContent = done ? "Completada ✓" : "Marcar hecha";
-        toggleBtn.className = done
-          ? "rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white"
-          : "rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-extrabold text-slate-700";
+      const refreshDoneBtn = () => {
+        if (s.status === "done") {
+          toggleBtn.textContent = "Completada ✓";
+          toggleBtn.className = "rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white";
+        } else {
+          toggleBtn.textContent = "Marcar hecha";
+          toggleBtn.className = "rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-3 py-1.5 text-xs font-extrabold text-slate-700";
+        }
       };
-      syncDoneBtn();
+      refreshDoneBtn();
       toggleBtn.onclick = () => {
-        ses.status = ses.status === "done" ? "pending" : "done";
-        syncDoneBtn();
+        s.status = s.status === "done" ? "pending" : "done";
+        refreshDoneBtn();
         persistState();
         renderWeek();
       };
 
-      renderRunAuditData(ses.audit);
+      renderRunAuditData(s);
 
-      const modal = document.getElementById("run-detail-modal");
+      const photoInput = document.getElementById("rd-photo-input");
+      photoInput.value = "";
+      photoInput.onchange = async () => {
+        if (!photoInput.files || photoInput.files.length === 0) return;
+        await analyzeGarminScreenshots(dIdx, sIdx, Array.from(photoInput.files));
+      };
+
       modal.classList.remove("hidden");
       modal.classList.add("flex");
     }
 
-    function renderRunAuditData(audit) {
+    function renderRunAuditData(s) {
       const mCard = document.getElementById("rd-metrics-card");
       const sCard = document.getElementById("rd-splits-card");
-      if (!audit) {
+      if (!s.audit) {
         mCard.classList.add("hidden");
         sCard.classList.add("hidden");
         return;
       }
-      mCard.classList.remove("hidden");
-      document.getElementById("rd-m-dist").textContent = audit.distanceKm ? `${audit.distanceKm} km` : "-";
-      document.getElementById("rd-m-time").textContent = audit.timeStr || "-";
-      document.getElementById("rd-m-pace").textContent = audit.avgPace ? `${audit.avgPace}/km` : "-";
-      document.getElementById("rd-m-hr").textContent = audit.avgHr ? `${audit.avgHr} ppm` : "-";
+
+      const a = s.audit;
+      document.getElementById("rd-m-dist").textContent = a.distanceKm ? `${a.distanceKm} km` : "-";
+      document.getElementById("rd-m-time").textContent = a.durationStr || "-";
+      document.getElementById("rd-m-pace").textContent = a.avgPace ? `${a.avgPace} /km` : "-";
+      document.getElementById("rd-m-hr").textContent = a.avgHr ? `${a.avgHr} ppm` : "-";
 
       const cadEl = document.getElementById("rd-m-cad");
-      const cadVal = Number(audit.avgCadence) || 0;
-      cadEl.textContent = cadVal ? `${cadVal} ppm` : "-";
-      cadEl.className = cadVal > 0 && cadVal < state.profile.cadenceMin
-        ? "mt-0.5 text-lg font-black text-red-600"
-        : "mt-0.5 text-lg font-black text-emerald-700";
+      if (a.avgCadence) {
+        const lowCad = Number(a.avgCadence) < state.profile.cadenceMin;
+        cadEl.textContent = `${a.avgCadence} ppm ${lowCad ? "⚠️ Baja" : "✓ Óptima"}`;
+        cadEl.className = `mt-0.5 text-lg font-black ${lowCad ? "text-amber-600" : "text-emerald-700"}`;
+      } else {
+        cadEl.textContent = "-";
+        cadEl.className = "mt-0.5 text-lg font-black text-slate-900";
+      }
 
-      document.getElementById("rd-summary-text").textContent = audit.summary || "";
-      document.getElementById("rd-bullets").innerHTML = (audit.bullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join("");
+      document.getElementById("rd-summary-text").textContent = a.summary || "";
+      document.getElementById("rd-bullets").innerHTML = (a.bullets || [])
+        .map(b => `<li>${escapeHtml(b)}</li>`)
+        .join("");
 
-      if (Array.isArray(audit.splits) && audit.splits.length > 0) {
-        sCard.classList.remove("hidden");
-        document.getElementById("rd-splits-count").textContent = `${audit.splits.length} tramos`;
-        document.getElementById("rd-splits-body").innerHTML = audit.splits.map(sp => `
+      mCard.classList.remove("hidden");
+
+      if (Array.isArray(a.splits) && a.splits.length > 0) {
+        document.getElementById("rd-splits-count").textContent = `${a.splits.length} tramos`;
+        document.getElementById("rd-splits-body").innerHTML = a.splits.map(sp => `
           <tr>
-            <td class="py-2 pr-2 font-bold text-slate-800">${escapeHtml(sp.label || "-")}</td>
-            <td class="py-2 px-2 text-slate-600">${escapeHtml(sp.durationOrDist || "-")}</td>
-            <td class="py-2 px-2 font-extrabold text-[#fc4c02]">${escapeHtml(sp.pace || "-")}</td>
-            <td class="py-2 pl-2 text-right font-bold text-slate-700">${escapeHtml(sp.hr || "-")}</td>
+            <td class="py-2 pr-2 font-bold text-slate-800">${escapeHtml(sp.label)}</td>
+            <td class="py-2 px-2 text-slate-600">${escapeHtml(sp.timeOrDist)}</td>
+            <td class="py-2 px-2 font-extrabold text-[#fc4c02]">${escapeHtml(sp.pace)}</td>
+            <td class="py-2 pl-2 text-right font-bold text-slate-700">${escapeHtml(sp.hr)}</td>
           </tr>
         `).join("");
+        sCard.classList.remove("hidden");
       } else {
         sCard.classList.add("hidden");
       }
     }
 
+    function fileToInlinePart(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const base64 = dataUrl.split(",")[1];
+          resolve({
+            inline_data: {
+              mime_type: file.type || "image/jpeg",
+              data: base64
+            }
+          });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    let cachedActiveModels = null;
+
+    async function discoverActiveGeminiModels(apiKey) {
+      if (cachedActiveModels) return cachedActiveModels;
+      const defaults = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash"
+      ];
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+        if (!res.ok) return defaults;
+        const data = await res.json();
+        const available = (data.models || [])
+          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+          .map(m => m.name.replace("models/", ""))
+          .filter(name => name.includes("gemini") && !name.includes("embedding") && !name.includes("vision"));
+        const combined = [...new Set([...defaults, ...available])];
+        cachedActiveModels = combined;
+        return combined;
+      } catch {
+        return defaults;
+      }
+    }
+
+    async function callGemini(promptText, imageParts = [], requireJson = false) {
+      const apiKey = (state.profile.geminiKey || DEFAULT_API_KEY || "").trim();
+      if (!apiKey) throw new Error("Configura tu Gemini API Key en Perfil.");
+
+      const models = await discoverActiveGeminiModels(apiKey);
+      const parts = [{ text: promptText }, ...imageParts];
+      const basePayload = { contents: [{ parts }] };
+      if (requireJson) {
+        basePayload.generationConfig = { responseMimeType: "application/json" };
+      }
+
+      let lastErr = "No se pudo conectar con Gemini.";
+      for (const model of models) {
+        const authModes = [
+          {
+            url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+            headers: { "Content-Type": "application/json" }
+          },
+          {
+            url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }
+          }
+        ];
+
+        for (const mode of authModes) {
+          try {
+            const res = await fetch(mode.url, {
+              method: "POST",
+              headers: mode.headers,
+              body: JSON.stringify(basePayload)
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              lastErr = `${model}: ${data?.error?.message || res.status}`;
+              if (res.status === 400 && requireJson && String(lastErr).toLowerCase().includes("json")) {
+                const retryNoJson = await fetch(mode.url, {
+                  method: "POST",
+                  headers: mode.headers,
+                  body: JSON.stringify({ contents: [{ parts }] })
+                });
+                const retryData = await retryNoJson.json();
+                if (retryNoJson.ok && retryData?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                  return retryData.candidates[0].content.parts[0].text;
+                }
+              }
+              continue;
+            }
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
+          } catch (e) {
+            lastErr = e.message || String(e);
+          }
+        }
+      }
+      throw new Error(lastErr);
+    }
+
+    function parseJsonSafe(rawText) {
+      const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+      return JSON.parse(cleaned);
+    }
+
+    async function analyzeGarminScreenshots(dIdx, sIdx, files) {
+      const loading = document.getElementById("rd-loading");
+      loading.classList.remove("hidden");
+      try {
+        const imageParts = await Promise.all(files.map(fileToInlinePart));
+        const week = state.weeks[state.currentWeekIdx];
+        const session = week.days[dIdx].sessions[sIdx];
+
+        const prompt = `Eres un entrenador de atletismo de alto nivel, directo y sin peloteo.
+Analiza estas capturas de Garmin para la sesión: "${session.title}" (${session.structure}).
+Perfil atleta: 183cm, ${state.profile.weight}kg, objetivo Media Maratón Sub-2h (5:15-5:25/km).
+Zonas: VT1 ${state.profile.zones.vt1}, Z2 ${state.profile.zones.z2}, Tempo ${state.profile.zones.tempo}, VT2 ${state.profile.zones.vt2}, Cadencia mínima ${state.profile.cadenceMin} ppm.
+
+REGLA CRÍTICA DE CALENTAMIENTO INICIAL:
+En rodajes y tiradas largas en Zona 2 (${state.profile.zones.z2} ppm), los primeros 10-15 minutos (km 1 y km 2) corresponden a la activación fisiológica progresiva desde reposo hasta alcanzar la Zona 2 sin hacer sprints iniciales. NO penalices ni taches de "lento" al atleta por ir más suave o con pulso bajo en esos primeros 10-15 minutos; evalúa la ejecución real de pulso y ritmo a partir del tramo estabilizado (minuto 12-15 en adelante).
+
+Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta:
+{
+  "distanceKm": "número o texto ej. 8.45",
+  "durationStr": "ej. 48:12",
+  "avgPace": "ej. 5:42",
+  "avgHr": 151,
+  "avgCadence": 168,
+  "summary": "Diagnóstico técnico directo en 2 líneas.",
+  "bullets": ["Punto clave 1", "Punto clave 2", "Punto clave 3"],
+  "splits": [{"label": "Km 1", "timeOrDist": "6:05", "pace": "6:05", "hr": "138 ppm"}],
+  "nextQualityTitle": "Prescripción concreta actualizada para la siguiente sesión de calidad si procede o cadena vacía",
+  "estimated21kPace": "ej. 5:28",
+  "paceBullets": ["Razón 1 del ritmo estimado", "Razón 2 del ritmo estimado"]
+}`;
+
+        const raw = await callGemini(prompt, imageParts, true);
+        const parsed = parseJsonSafe(raw);
+
+        session.audit = parsed;
+        session.status = "done";
+
+        if (parsed.estimated21kPace) {
+          state.paceHistory.push({
+            date: new Date().toISOString().slice(0, 10),
+            pace: parsed.estimated21kPace
+          });
+          if (Array.isArray(parsed.paceBullets)) state.paceBullets = parsed.paceBullets;
+        }
+
+        if (parsed.nextQualityTitle) {
+          for (let w = state.currentWeekIdx; w < state.weeks.length; w++) {
+            const candidate = state.weeks[w].days
+              .flatMap(d => d.sessions)
+              .find(x => x.type === "run" && x.status === "pending" && x.id !== session.id && (x.title.includes("x") || x.title.includes("Tempo") || x.title.includes("VT2")));
+            if (candidate) {
+              candidate.title = parsed.nextQualityTitle;
+              break;
+            }
+          }
+        }
+
+        persistState();
+        renderRunAuditData(session);
+        renderWeek();
+        renderProgreso();
+        showToast("Auditoría Garmin completada");
+      } catch (err) {
+        alert("Error IA: " + err.message);
+      } finally {
+        loading.classList.add("hidden");
+      }
+    }
+
+    async function importGymFromPhoto(dIdx, sIdx, file) {
+      showToast("Leyendo rutina desde imagen...");
+      try {
+        const part = await fileToInlinePart(file);
+        const prompt = `Extrae los ejercicios de gimnasio de esta imagen. Devuelve SOLO un JSON array con objetos: [{"name": "Nombre ejercicio", "sets": 3, "reps": "10", "weight": 0}]`;
+        const raw = await callGemini(prompt, [part], true);
+        const items = parseJsonSafe(raw);
+        if (Array.isArray(items) && items.length > 0) {
+          const session = state.weeks[state.currentWeekIdx].days[dIdx].sessions[sIdx];
+          session.exercises = items.map((it, i) => ({
+            id: `img-ex-${Date.now()}-${i}`,
+            name: it.name || "Ejercicio",
+            sets: Number(it.sets) || 3,
+            reps: String(it.reps || "10"),
+            weight: Number(it.weight) || 0,
+            done: false
+          }));
+          propagateGymRoutine(dIdx, session.exercises);
+          persistState();
+          renderWeek();
+          showToast("Rutina importada y propagada");
+        }
+      } catch (err) {
+        alert("Error leyendo imagen: " + err.message);
+      }
+    }
+
+    async function proposeWeekAdaptationByFeelings() {
+      const input = document.getElementById("ai-adapt-input").value.trim();
+      if (!input) {
+        showToast("Describe primero tus sensaciones o disponibilidad");
+        return;
+      }
+      const box = document.getElementById("ai-adapt-proposal");
+      box.innerHTML = `<div class="rounded-xl bg-orange-50 p-2.5 text-xs font-bold text-[#fc4c02]">Analizando sensaciones y diseñando ajuste personalizado...</div>`;
+
+      const week = state.weeks[state.currentWeekIdx];
+      const prompt = `Eres entrenador personal experto en Media Maratón y salud articular.
+El atleta reporta estas sensaciones o situación para ${week.label}: "${input}".
+Perfil: ${state.profile.notes}. Zonas: VT1 ${state.profile.zones.vt1}, Z2 ${state.profile.zones.z2}, VT2 ${state.profile.zones.vt2}.
+Plan actual de la semana:
+${JSON.stringify(week.days)}
+
+Diseña un reajuste personalizado según sus sensaciones reales (sin recortes mecánicos rígidos del 50%, adaptando intensidad, duración o sustituyendo impactos por trabajo protector en VT1/Z2 o fuerza isométrica si hay molestia).
+IMPORTANTE: Respeta intactas las sesiones con status === "done".
+Devuelve ÚNICAMENTE un JSON válido:
+{
+  "explanation": "Explicación breve y directa en 2-3 puntos del ajuste propuesto según sensaciones",
+  "days": [ ...misma estructura exacta de los 7 días de week.days... ]
+}`;
+
+      try {
+        const raw = await callGemini(prompt, [], true);
+        const proposal = parseJsonSafe(raw);
+        if (!Array.isArray(proposal.days) || proposal.days.length !== 7) {
+          throw new Error("Formato de propuesta inválido");
+        }
+
+        box.innerHTML = `
+          <div class="rounded-xl border border-orange-200 bg-orange-50/60 p-3 space-y-2">
+            <div class="text-xs font-extrabold text-slate-900">Propuesta personalizada según sensaciones:</div>
+            <p class="text-xs text-slate-700">${escapeHtml(proposal.explanation)}</p>
+            <div class="flex gap-2">
+              <button type="button" id="confirm-adapt-btn" class="rounded-xl bg-[#fc4c02] px-3 py-1.5 text-xs font-extrabold text-white">Aplicar ajuste</button>
+              <button type="button" id="cancel-adapt-btn" class="rounded-xl border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-bold text-slate-600">Descartar</button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById("confirm-adapt-btn").onclick = () => {
+          proposal.days.forEach((newDay, idx) => {
+            const oldDone = week.days[idx].sessions.filter(s => s.status === "done");
+            const newPending = (newDay.sessions || []).filter(s => s.status !== "done");
+            week.days[idx].off = Boolean(newDay.off && oldDone.length === 0 && newPending.length === 0);
+            week.days[idx].sessions = [...oldDone, ...newPending];
+          });
+          persistState();
+          renderWeek();
+          box.innerHTML = "";
+          showToast("Plan semanal adaptado a tus sensaciones");
+        };
+        document.getElementById("cancel-adapt-btn").onclick = () => {
+          box.innerHTML = "";
+        };
+      } catch (err) {
+        box.innerHTML = `<div class="rounded-xl bg-red-50 p-2.5 text-xs font-bold text-red-600">Error IA: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function applyNoWeekendMode() {
+      const week = state.weeks[state.currentWeekIdx];
+      const pendingRuns = [];
+      const pendingGyms = [];
+
+      week.days.forEach((d) => {
+        const keepDone = d.sessions.filter(s => s.status === "done");
+        d.sessions.filter(s => s.status !== "done").forEach(s => {
+          if (s.type === "run") pendingRuns.push(s);
+          else pendingGyms.push(s);
+        });
+        d.sessions = keepDone;
+        d.off = keepDone.length === 0;
+      });
+
+      const runTargets = [0, 2, 4];
+      const gymTargets = [1, 3];
+      pendingRuns.slice(0, 3).forEach((s, i) => {
+        const dIdx = runTargets[i];
+        week.days[dIdx].off = false;
+        week.days[dIdx].sessions.push(s);
+      });
+      pendingGyms.slice(0, 2).forEach((s, i) => {
+        const dIdx = gymTargets[i];
+        week.days[dIdx].off = false;
+        week.days[dIdx].sessions.push(s);
+      });
+
+      persistState();
+      renderWeek();
+      showToast("Reorganizado L-V (3 carrera / 2 gym)");
+    }
+
     function renderProgreso() {
-      const hasPace = state.paceHistory.length > 0;
-      const valEl = document.getElementById("est-pace-val");
-      const confEl = document.getElementById("est-pace-conf");
-      const chartBtn = document.getElementById("toggle-pace-chart");
+      const latestPace = state.paceHistory[state.paceHistory.length - 1];
+      const paceVal = document.getElementById("est-pace-val");
+      const paceConf = document.getElementById("est-pace-conf");
+      const toggleChart = document.getElementById("toggle-pace-chart");
       const noteEl = document.getElementById("est-pace-note");
       const bulletsEl = document.getElementById("pace-ai-bullets");
 
-      if (!hasPace) {
-        valEl.textContent = "Sin datos registrados";
-        confEl.classList.add("hidden");
-        chartBtn.classList.add("hidden");
-        noteEl.textContent = "Sube una captura de Garmin en cualquier sesión de carrera para calcular tu ritmo estimado actual en 21,1 km.";
+      if (!latestPace) {
+        paceVal.textContent = "Sin datos registrados";
+        paceConf.classList.add("hidden");
+        toggleChart.classList.add("hidden");
+        noteEl.textContent = "Sube tu primera captura de Garmin en una sesión de carrera para calcular tu ritmo estimado en 21,1 km.";
         bulletsEl.innerHTML = "";
       } else {
-        const last = state.paceHistory[state.paceHistory.length - 1];
-        valEl.textContent = `${last.pace}/km`;
-        confEl.textContent = last.finishEst || "Proyección 21.1K";
-        confEl.classList.remove("hidden");
-        chartBtn.classList.remove("hidden");
-        noteEl.textContent = `Actualizado el ${last.date} · Objetivo Sub-2h (< 5:40/km · meta plan 5:15–5:25/km)`;
+        paceVal.textContent = `${latestPace.pace} min/km`;
+        paceConf.textContent = "Actualizado";
+        paceConf.classList.remove("hidden");
+        toggleChart.classList.remove("hidden");
+        noteEl.textContent = "Proyección sobre distancia oficial 21,1 km (meta < 5:40/km · objetivo plan 5:15–5:25/km).";
         bulletsEl.innerHTML = (state.paceBullets || []).map(b => `<li>${escapeHtml(b)}</li>`).join("");
+        renderSvgLine("pace-svg", state.paceHistory.map(p => ({
+          label: p.date.slice(5),
+          val: paceStrToSec(p.pace),
+          display: p.pace
+        })), true);
       }
 
       const wPill = document.getElementById("current-weight-pill");
-      wPill.textContent = `${String(state.profile.weight).replace(".", ",")} kg`;
-      document.getElementById("weight-list").innerHTML = [...state.weights].reverse().slice(0, 8).map(w => `
-        <li class="flex items-center justify-between rounded-xl bg-[#f7f7fa] px-3 py-2 border border-slate-100">
-          <span class="font-bold text-slate-800">${escapeHtml(w.date)} · ${escapeHtml(String(w.val).replace(".", ","))} kg</span>
-          <span class="text-slate-500">${escapeHtml(w.note || "")}</span>
-        </li>
-      `).join("");
+      if (wPill) wPill.textContent = `${String(state.profile.weight).replace(".", ",")} kg`;
 
-      drawWeightSvg();
+      renderSvgLine("weight-svg", state.weights.map(w => ({
+        label: w.date.slice(5),
+        val: Number(w.val),
+        display: `${w.val}kg`
+      })), false);
+
+      const wList = document.getElementById("weight-list");
+      if (wList) {
+        wList.innerHTML = [...state.weights].reverse().slice(0, 6).map(w => `
+          <li class="flex items-center justify-between rounded-xl bg-[#f7f7fa] px-3 py-2">
+            <span class="font-bold text-slate-800">${String(w.val).replace(".", ",")} kg</span>
+            <span class="text-slate-500">${escapeHtml(w.note || "")}</span>
+            <span class="text-[11px] font-semibold text-slate-400">${escapeHtml(w.date)}</span>
+          </li>
+        `).join("");
+      }
     }
 
-    function drawWeightSvg() {
-      const svg = document.getElementById("weight-svg");
-      const pts = state.weights;
-      if (!pts.length) {
-        svg.innerHTML = "";
+    function paceStrToSec(pStr) {
+      const parts = String(pStr).split(":").map(Number);
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      return 340;
+    }
+
+    function renderSvgLine(svgId, points, invertY = false) {
+      const svg = document.getElementById(svgId);
+      if (!svg) return;
+      if (!points || points.length === 0) {
+        svg.innerHTML = `<text x="170" y="85" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="700">Sin registros suficientes</text>`;
         return;
       }
-      const vals = pts.map(p => Number(p.val));
-      const minV = Math.min(...vals) - 0.5;
-      const maxV = Math.max(...vals) + 0.5;
-      const span = Math.max(0.5, maxV - minV);
-      const coords = pts.map((p, idx) => {
-        const x = pts.length === 1 ? 170 : 28 + (idx / (pts.length - 1)) * 284;
-        const y = 132 - ((Number(p.val) - minV) / span) * 100;
-        return { x, y, val: p.val, date: p.date };
+      const W = 340, H = 160, pad = 28;
+      const vals = points.map(p => p.val);
+      let minV = Math.min(...vals);
+      let maxV = Math.max(...vals);
+      if (minV === maxV) { minV -= 1; maxV += 1; }
+
+      const coords = points.map((p, i) => {
+        const x = points.length === 1 ? W / 2 : pad + (i / (points.length - 1)) * (W - pad * 2);
+        const norm = (p.val - minV) / (maxV - minV);
+        const y = invertY
+          ? pad + norm * (H - pad * 2)
+          : H - pad - norm * (H - pad * 2);
+        return { x, y, ...p };
       });
+
       const poly = coords.map(c => `${c.x},${c.y}`).join(" ");
+      const dots = coords.map(c => `
+        <circle cx="${c.x}" cy="${c.y}" r="4" fill="#fc4c02" />
+        <text x="${c.x}" y="${Math.max(14, c.y - 8)}" text-anchor="middle" fill="#0f172a" font-size="9" font-weight="800">${escapeHtml(c.display)}</text>
+        <text x="${c.x}" y="${H - 8}" text-anchor="middle" fill="#64748b" font-size="9">${escapeHtml(c.label)}</text>
+      `).join("");
+
       svg.innerHTML = `
-        <polyline fill="none" stroke="#fc4c02" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${poly}" />
-        ${coords.map(c => `
-          <circle cx="${c.x}" cy="${c.y}" r="4.5" fill="#fc4c02" stroke="#ffffff" stroke-width="2" />
-          <text x="${c.x}" y="${Math.max(16, c.y - 9)}" text-anchor="middle" font-size="10" font-weight="800" fill="#0f172a">${String(c.val).replace(".", ",")}</text>
-        `).join("")}
+        <polyline fill="none" stroke="#fc4c02" stroke-width="2.5" points="${poly}" />
+        ${dots}
       `;
     }
 
-    function renderChat() {
-      const box = document.getElementById("chat-history");
-      if (!state.chatHistory.length) {
-        box.innerHTML = `<p class="text-[11px] text-slate-400">Sin consultas recientes. Usa un acceso rápido o escribe tu duda arriba.</p>`;
-        return;
+    function renderConsultor() {
+      const histEl = document.getElementById("chat-history");
+      if (histEl) {
+        histEl.innerHTML = state.chatHistory.slice(-8).map(m => `
+          <div class="rounded-xl ${m.role === "user" ? "bg-slate-900 text-white ml-6" : "bg-[#f7f7fa] border border-slate-200 text-slate-800 mr-4"} p-3 text-xs leading-relaxed whitespace-pre-line">
+            ${escapeHtml(m.text)}
+          </div>
+        `).join("");
       }
-      box.innerHTML = state.chatHistory.slice(-8).map(m => `
-        <div class="rounded-xl p-3 text-xs ${m.role === "user" ? "bg-slate-900 text-white ml-6" : "bg-[#f7f7fa] border border-slate-200 text-slate-800 mr-4 whitespace-pre-line"}">
-          ${escapeHtml(m.text)}
-        </div>
-      `).join("");
+
+      const mWeek = state.weeks[state.mealsWeekIdx];
+      const mSel = document.getElementById("meals-week-select");
+      if (mSel && mWeek) {
+        mSel.innerHTML = state.weeks
+          .map((w, idx) => `<option value="${idx}" ${idx === state.mealsWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`)
+          .join("");
+      }
+      const mRef = document.getElementById("meals-week-ref");
+      if (mRef && mWeek) mRef.textContent = mWeek.phase;
+
+      const mOut = document.getElementById("meals-output");
+      if (mOut && mWeek) {
+        const saved = state.mealsByWeek[mWeek.weekNum];
+        mOut.innerHTML = saved
+          ? `<div class="rounded-xl border border-slate-100 bg-[#f7f7fa] p-3 whitespace-pre-line leading-relaxed">${escapeHtml(saved)}</div>`
+          : `<p class="text-slate-400 py-4 text-center">Pulsa "Generar semana" para crear la pauta nutricional adaptada a los entrenos de ${escapeHtml(mWeek.label)}.</p>`;
+      }
     }
 
-    function renderMeals() {
-      const sel = document.getElementById("meals-week-select");
-      sel.innerHTML = state.weeks.map((w, idx) =>
-        `<option value="${idx}" ${idx === state.mealsWeekIdx ? "selected" : ""}>${escapeHtml(w.label)}</option>`
-      ).join("");
-      const week = state.weeks[state.mealsWeekIdx];
-      document.getElementById("meals-week-ref").textContent = week.phase;
-      const saved = state.mealsByWeek[state.mealsWeekIdx];
-      const out = document.getElementById("meals-output");
-      if (!saved) {
-        out.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-4 text-center text-slate-400">Pulsa <strong>Generar semana</strong> para crear la pauta nutricional adaptada a los entrenamientos activos de ${escapeHtml(week.label)}.</div>`;
-      } else {
-        out.innerHTML = `<div class="rounded-xl border border-slate-100 bg-[#f7f7fa] p-3.5 whitespace-pre-line leading-relaxed">${escapeHtml(saved)}</div>`;
+    async function sendChatMessage(customText = null) {
+      const inp = document.getElementById("chat-input");
+      const q = (customText || inp.value).trim();
+      if (!q) return;
+      if (!customText) inp.value = "";
+
+      state.chatHistory.push({ role: "user", text: q });
+      renderConsultor();
+
+      const week = state.weeks[state.currentWeekIdx];
+      const prompt = `Eres un entrenador personal técnico, directo, sincero y sin peloteo.
+Atleta: 183cm, ${state.profile.weight}kg. Objetivo: Media Maratón Sub-2h (5:15-5:25/km).
+Zonas: VT1 ${state.profile.zones.vt1}, Z2 ${state.profile.zones.z2}, Tempo ${state.profile.zones.tempo}, VT2 ${state.profile.zones.vt2}, VO2MAX ${state.profile.zones.vo2}, Cadencia mínima ${state.profile.cadenceMin} ppm.
+Notas: ${state.profile.notes}.
+Semana actual (${week.label}): ${JSON.stringify(week.days.map(d => ({ dia: d.dayName, off: d.off, sesiones: d.sessions.map(s => `${s.title} (${s.durationMin}m, ${s.status})`) })))}.
+Responde en viñetas concisas, accionables y sin rodeos a: "${q}"`;
+
+      try {
+        const reply = await callGemini(prompt, [], false);
+        state.chatHistory.push({ role: "ai", text: reply.trim() });
+        persistState();
+        renderConsultor();
+      } catch (err) {
+        state.chatHistory.push({ role: "ai", text: `Error IA: ${err.message}` });
+        renderConsultor();
+      }
+    }
+
+    async function generateWeeklyMeals() {
+      const mWeek = state.weeks[state.mealsWeekIdx];
+      const mOut = document.getElementById("meals-output");
+      mOut.innerHTML = `<div class="rounded-xl bg-orange-50 p-3 text-xs font-bold text-[#fc4c02]">Generando pauta semanal con IA...</div>`;
+
+      const isRaceWeek = mWeek.weekNum === 15;
+      const prompt = `Eres nutricionista deportivo. Genera una pauta semanal de comidas en viñetas por día (Lunes a Domingo) para ${mWeek.label} (${mWeek.phase}).
+Atleta: 183cm, ${state.profile.weight}kg, prioridad pérdida de grasa controlada y rendimiento en Media Maratón.
+Entrenamientos de esta semana: ${JSON.stringify(mWeek.days.map(d => ({ dia: d.dayName, off: d.off, sesiones: d.sessions.map(s => `${s.type}: ${s.title} (${s.durationMin} min)`) })))}.
+${isRaceWeek ? "SEMANA DE COMPETICIÓN: incluye carga de hidratos los 2-3 días previos y estrategia exacta de desayuno + geles/hidratación para el domingo." : "Semanas previas: déficit calórico moderado en días suaves y aporte adecuado de carbohidratos alrededor de calidad y tirada larga (integrando prueba de 1 gel si la tirada ≥ 85 min)."}
+No recomiendes suplementos innecesarios. Formato limpio y escaneable.`;
+
+      try {
+        const res = await callGemini(prompt, [], false);
+        state.mealsByWeek[mWeek.weekNum] = res.trim();
+        persistState();
+        renderConsultor();
+      } catch (err) {
+        mOut.innerHTML = `<div class="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-600">Error IA: ${escapeHtml(err.message)}</div>`;
       }
     }
 
     function renderPerfil() {
+      const gList = document.getElementById("goals-list");
+      if (gList) {
+        gList.innerHTML = state.goals.map(g => `
+          <div class="flex items-center justify-between py-2.5">
+            <div>
+              <div class="text-xs font-extrabold text-slate-900">${escapeHtml(g.name)}</div>
+              <div class="text-[11px] text-slate-500">Ritmo: ${escapeHtml(g.pace)}/km · Fecha: ${escapeHtml(g.date)}</div>
+            </div>
+            <button data-activate-goal="${g.id}" class="rounded-lg px-2.5 py-1 text-[11px] font-extrabold ${g.active ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}">
+              ${g.active ? "Activo ✓" : "Activar"}
+            </button>
+          </div>
+        `).join("");
+
+        gList.querySelectorAll("[data-activate-goal]").forEach(btn => {
+          btn.onclick = () => {
+            const id = btn.getAttribute("data-activate-goal");
+            state.goals.forEach(x => x.active = x.id === id);
+            persistState();
+            renderHeader();
+            renderPerfil();
+          };
+        });
+      }
+
       document.getElementById("p-height").value = state.profile.height;
       document.getElementById("p-weight").value = state.profile.weight;
       document.getElementById("p-cadence").value = state.profile.cadenceMin;
@@ -1488,110 +1827,88 @@
       document.getElementById("z-vo2").value = state.profile.zones.vo2;
       document.getElementById("p-notes").value = state.profile.notes || "";
       document.getElementById("k-gemini").value = state.profile.geminiKey || "";
+      updateApiKeyPreviewBadge();
 
-      document.getElementById("goals-list").innerHTML = state.goals.map((g, idx) => `
-        <div class="flex items-center justify-between py-2.5">
-          <div>
-            <div class="flex items-center gap-1.5">
-              <span class="text-xs font-extrabold text-slate-900">${escapeHtml(g.name)}</span>
-              ${g.active ? `<span class="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-800">Activo</span>` : ""}
-            </div>
-            <div class="text-[11px] text-slate-500">Ritmo: ${escapeHtml(g.pace)}/km · Fecha: ${escapeHtml(g.date)}</div>
-          </div>
-          ${!g.active ? `<button type="button" data-activate-goal="${idx}" class="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700">Activar</button>` : ""}
-        </div>
-      `).join("");
-
-      document.querySelectorAll("[data-activate-goal]").forEach(btn => {
-        btn.onclick = () => {
-          const idx = Number(btn.dataset.activateGoal);
-          state.goals.forEach((g, i) => g.active = i === idx);
-          persistState();
-          renderHeader();
-          renderPerfil();
-        };
-      });
-
-      const renderDayChips = (containerId, selectedArr, stateField) => {
-        const el = document.getElementById(containerId);
-        el.innerHTML = WEEKDAYS.map(d => {
+      const renderDayChips = (containerId, selectedArr, stateKey) => {
+        const wrap = document.getElementById(containerId);
+        if (!wrap) return;
+        wrap.innerHTML = WEEKDAYS.map(d => {
           const active = selectedArr.includes(d.key);
-          return `<button type="button" data-pref="${stateField}:${d.key}" class="rounded-xl border py-2 text-xs font-extrabold ${active ? "border-[#fc4c02] bg-[#fc4c02] text-white" : "border-slate-200 bg-[#f7f7fa] text-slate-600"}">${d.key}</button>`;
+          return `<button type="button" data-chip="${stateKey}:${d.key}" class="rounded-xl border py-2 text-xs font-extrabold ${active ? "border-[#fc4c02] bg-[#fc4c02] text-white" : "border-[#e2e8f0] bg-[#f7f7fa] text-slate-600"}">${d.key}</button>`;
         }).join("");
-        el.querySelectorAll("[data-pref]").forEach(b => {
-          b.onclick = () => {
-            const [field, k] = b.dataset.pref.split(":");
-            const list = state.profile[field];
-            const pos = list.indexOf(k);
-            if (pos >= 0) list.splice(pos, 1);
-            else list.push(k);
-            renderDayChips(containerId, list, stateField);
+
+        wrap.querySelectorAll("[data-chip]").forEach(btn => {
+          btn.onclick = () => {
+            const [key, dayKey] = btn.getAttribute("data-chip").split(":");
+            const arr = state.profile[key];
+            const idx = arr.indexOf(dayKey);
+            if (idx >= 0) arr.splice(idx, 1);
+            else arr.push(dayKey);
+            renderPerfil();
           };
         });
       };
 
       renderDayChips("pref-run-days", state.profile.prefRunDays, "prefRunDays");
       renderDayChips("pref-gym-days", state.profile.prefGymDays, "prefGymDays");
-      updateApiKeyPreviewBadge();
     }
 
     function updateApiKeyPreviewBadge() {
-      const key = (state.profile.geminiKey || "").trim();
+      const k = (document.getElementById("k-gemini")?.value || state.profile.geminiKey || "").trim();
       const badge = document.getElementById("api-key-preview-badge");
       if (!badge) return;
-      if (!key) {
+      if (!k) {
         badge.textContent = "Sin clave";
-      } else if (key.length > 10) {
-        badge.textContent = `${key.slice(0, 6)}...${key.slice(-4)}`;
+      } else if (k.length > 12) {
+        badge.textContent = `${k.slice(0, 6)}…${k.slice(-4)}`;
       } else {
-        badge.textContent = "Configurada";
+        badge.textContent = "Cargada";
       }
     }
 
-    function switchMainTab(tabName) {
+    function switchTab(tabName) {
       const tabs = ["semana", "progreso", "consultor", "perfil"];
       tabs.forEach(t => {
         const sec = document.getElementById(`tab-${t}`);
         const nav = document.getElementById(`nav-${t}`);
-        const isCurrent = t === tabName;
-        sec.classList.toggle("hidden", !isCurrent);
-        nav.classList.toggle("border-[#fc4c02]", isCurrent);
-        nav.classList.toggle("text-[#fc4c02]", isCurrent);
-        nav.classList.toggle("border-transparent", !isCurrent);
-        nav.classList.toggle("text-slate-400", !isCurrent);
+        if (sec) sec.classList.toggle("hidden", t !== tabName);
+        if (nav) {
+          nav.classList.toggle("border-[#fc4c02]", t === tabName);
+          nav.classList.toggle("text-[#fc4c02]", t === tabName);
+          nav.classList.toggle("border-transparent", t !== tabName);
+          nav.classList.toggle("text-slate-400", t !== tabName);
+        }
       });
+
+      if (tabName === "semana") renderWeek();
       if (tabName === "progreso") renderProgreso();
-      if (tabName === "consultor") {
-        renderChat();
-        renderMeals();
-      }
+      if (tabName === "consultor") renderConsultor();
       if (tabName === "perfil") renderPerfil();
     }
 
-    function attachSwipe(elementId, onSwipeLeft, onSwipeRight) {
-      const el = document.getElementById(elementId);
+    function attachSwipe(el, onLeft, onRight) {
       if (!el) return;
       let startX = 0;
       let startY = 0;
-      el.addEventListener("touchstart", e => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
+      el.addEventListener("touchstart", (e) => {
+        startX = e.changedTouches[0].screenX;
+        startY = e.changedTouches[0].screenY;
       }, { passive: true });
-      el.addEventListener("touchend", e => {
-        const dx = e.changedTouches[0].clientX - startX;
-        const dy = e.changedTouches[0].clientY - startY;
+      el.addEventListener("touchend", (e) => {
+        const dx = e.changedTouches[0].screenX - startX;
+        const dy = e.changedTouches[0].screenY - startY;
         if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
-          if (dx < 0) onSwipeLeft();
-          else onSwipeRight();
+          if (dx < 0) onLeft();
+          else onRight();
         }
       }, { passive: true });
     }
 
     function bindGlobalControls() {
-      document.getElementById("nav-semana").onclick = () => switchMainTab("semana");
-      document.getElementById("nav-progreso").onclick = () => switchMainTab("progreso");
-      document.getElementById("nav-consultor").onclick = () => switchMainTab("consultor");
-      document.getElementById("nav-perfil").onclick = () => switchMainTab("perfil");
+      document.getElementById("nav-semana").onclick = () => switchTab("semana");
+      document.getElementById("nav-progreso").onclick = () => switchTab("progreso");
+      document.getElementById("nav-consultor").onclick = () => switchTab("consultor");
+      document.getElementById("nav-perfil").onclick = () => switchTab("perfil");
 
       document.getElementById("prev-week").onclick = () => {
         if (state.currentWeekIdx > 0) {
@@ -1605,157 +1922,40 @@
           renderWeek();
         }
       };
-      document.getElementById("week-select").onchange = e => {
+      document.getElementById("week-select").onchange = (e) => {
         state.currentWeekIdx = Number(e.target.value);
         renderWeek();
       };
 
+      attachSwipe(
+        document.getElementById("swipe-week-area"),
+        () => { if (state.currentWeekIdx < state.weeks.length - 1) { state.currentWeekIdx++; renderWeek(); } },
+        () => { if (state.currentWeekIdx > 0) { state.currentWeekIdx--; renderWeek(); } }
+      );
+
       document.getElementById("toggle-week-tools").onclick = () => {
         document.getElementById("week-tools-panel").classList.toggle("hidden");
       };
+      document.getElementById("no-wknd-btn").onclick = applyNoWeekendMode;
+      document.getElementById("ai-adapt-run").onclick = proposeWeekAdaptationByFeelings;
 
-      document.getElementById("no-wknd-btn").onclick = () => {
-        const week = state.weeks[state.currentWeekIdx];
-        const sat = week.days[5];
-        const fri = week.days[4];
-        const lr = sat.sessions.find(s => s.type === "run");
-        if (lr && lr.status === "pending") {
-          fri.off = false;
-          fri.sessions = [lr];
-          sat.off = true;
-          sat.sessions = [];
-          week.days[6].off = true;
-          week.days[6].sessions = [];
-          persistState();
-          renderWeek();
-          showToast("Semana adaptada sin finde (3 carrera / 2 gym)");
-        } else {
-          showToast("La tirada larga ya estaba ajustada o completada");
-        }
-      };
-
-      document.getElementById("ai-adapt-run").onclick = async () => {
-        const msg = document.getElementById("ai-adapt-input").value.trim();
-        if (!msg) return showToast("Describe tus sensaciones o disponibilidad");
-        const box = document.getElementById("ai-adapt-proposal");
-        box.innerHTML = `<div class="rounded-xl bg-orange-50 p-2.5 text-xs font-bold text-[#fc4c02]">Analizando sensaciones con Gemini IA...</div>`;
-        const week = state.weeks[state.currentWeekIdx];
-        try {
-          const prompt = `Eres un entrenador de running directo y experto en prevención articular (rótula, cintilla iliotibial).
-Atleta: 183 cm, ${state.profile.weight} kg, objetivo Media Maratón Sub-2h (5:15-5:25/km), zonas VT1 ${state.profile.zones.vt1}, Z2 ${state.profile.zones.z2}, VT2 ${state.profile.zones.vt2}, cadencia mín ${state.profile.cadenceMin} ppm.
-Semana actual (${week.label}): ${JSON.stringify(week.days)}.
-Sensaciones/petición del atleta: "${msg}".
-Reglas:
-1. NO toques sesiones con status="done".
-2. Adapta las sesiones pendientes según sus sensaciones (si reporta molestia articular o fatiga, ajusta volumen/intensidad o sustituye impactos de forma inteligente sin aplicar recortes ciegos; pierna nunca antes de tirada larga).
-3. Devuelve JSON exacto: {"explanation":"Explicación breve en viñetas","days":[...misma estructura de 7 días...]}.`;
-          const raw = await callGemini(prompt, [], true);
-          const data = extractJsonFromText(raw);
-          box.innerHTML = `
-            <div class="rounded-xl border border-orange-200 bg-orange-50/60 p-3 space-y-2 text-xs">
-              <div class="font-extrabold text-slate-900">Propuesta según tus sensaciones:</div>
-              <div class="whitespace-pre-line text-slate-700">${escapeHtml(data.explanation || "")}</div>
-              <button type="button" id="confirm-ai-week-btn" class="rounded-xl bg-[#fc4c02] px-3 py-1.5 text-xs font-extrabold text-white">Aplicar ajuste</button>
-            </div>
-          `;
-          document.getElementById("confirm-ai-week-btn").onclick = () => {
-            if (Array.isArray(data.days) && data.days.length === 7) {
-              week.days = data.days;
-              persistState();
-              renderWeek();
-              box.innerHTML = "";
-              showToast("Semana actualizada según sensaciones");
-            }
-          };
-        } catch (err) {
-          box.innerHTML = `<div class="rounded-xl bg-red-50 p-2.5 text-xs font-bold text-red-700">Error IA: ${escapeHtml(err.message)}</div>`;
-        }
-      };
-
-      // CERRAR DETALLE CARRERA Y SUBIR CAPTURAS GARMIN
       document.getElementById("close-run-detail").onclick = () => {
         const modal = document.getElementById("run-detail-modal");
         modal.classList.add("hidden");
         modal.classList.remove("flex");
       };
 
-      document.getElementById("rd-photo-input").onchange = async e => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length || !activeDetailRef) return;
-        const loading = document.getElementById("rd-loading");
-        loading.classList.remove("hidden");
-        try {
-          const imgs = await Promise.all(files.map(fileToBase64));
-          const { weekIdx, dayIdx, sesIdx } = activeDetailRef;
-          const week = state.weeks[weekIdx];
-          const ses = week.days[dayIdx].sessions[sesIdx];
-
-          const prompt = `Analiza estas capturas de Garmin de la sesión "${ses.title}" (${ses.structure}, pulso objetivo ${ses.targetHr}).
-Perfil atleta: VT1 ${state.profile.zones.vt1} ppm, Zona 2 ${state.profile.zones.z2} ppm, Tempo ${state.profile.zones.tempo} ppm, VT2 ${state.profile.zones.vt2} ppm, cadencia mínima ${state.profile.cadenceMin} ppm.
-REGLA CRÍTICA DE CALENTAMIENTO INICIAL: En rodajes aeróbicos y tiradas largas en Zona 2, los primeros 10-15 minutos (km 1 y km 2) corresponden a la activación fisiológica progresiva desde reposo hasta alcanzar Zona 2 sin hacer sprints iniciales; NO penalices ni califiques como "lento" o "fuera de zona" ese calentamiento inicial, evalúa el pulso y ritmo reales sobre el tramo estabilizado posterior (minuto 12-15 en adelante).
-Tono: directo, técnico, sin peloteo.
-Devuelve JSON estricto:
-{
-  "distanceKm": "6.62",
-  "timeStr": "40:02",
-  "avgPace": "6:03",
-  "avgHr": "145",
-  "avgCadence": "169",
-  "summary": "Resumen técnico en 1-2 frases.",
-  "bullets": ["Punto clave 1", "Punto clave 2"],
-  "splits": [{"label":"Km 1 / Serie 1","durationOrDist":"1.0 km","pace":"6:15","hr":"136 ppm"}],
-  "est21kPace": "5:28",
-  "est21kFinish": "1:55:20",
-  "estBullets": ["Motivo proyección 21K 1", "Motivo proyección 21K 2"],
-  "nextQualityTitle": "Nueva prescripción concreta de series para la próxima sesión de calidad"
-}`;
-          const raw = await callGemini(prompt, imgs, true);
-          const parsed = extractJsonFromText(raw);
-          ses.audit = parsed;
-          ses.status = "done";
-
-          if (parsed.est21kPace) {
-            const today = new Date().toISOString().slice(0, 10);
-            state.paceHistory.push({
-              date: today,
-              pace: parsed.est21kPace,
-              finishEst: parsed.est21kFinish || ""
-            });
-            state.paceBullets = parsed.estBullets || [];
-          }
-
-          if (parsed.nextQualityTitle) {
-            for (let w = weekIdx + 1; w < state.weeks.length; w++) {
-              const qSes = state.weeks[w].days[1]?.sessions?.find(s => s.type === "run" && s.status === "pending");
-              if (qSes) {
-                qSes.title = parsed.nextQualityTitle;
-                qSes.structure = `10' calentamiento Z2 + ${parsed.nextQualityTitle} + 6' enfriamiento`;
-                break;
-              }
-            }
-          }
-
-          persistState();
-          renderWeek();
-          openRunDetail(weekIdx, dayIdx, sesIdx);
-          showToast("Auditoría Garmin completada");
-        } catch (err) {
-          showToast("Error analizando captura: " + err.message);
-        } finally {
-          loading.classList.add("hidden");
-          e.target.value = "";
-        }
-      };
-
-      // PROGRESO
       document.getElementById("toggle-pace-chart").onclick = () => {
         document.getElementById("pace-chart-wrap").classList.toggle("hidden");
       };
 
       document.getElementById("add-weight-btn").onclick = () => {
         const val = parseFloat(document.getElementById("new-weight-val").value);
+        if (!val || val < 35 || val > 200) {
+          showToast("Introduce un peso válido");
+          return;
+        }
         const note = document.getElementById("new-weight-note").value.trim();
-        if (!val || val < 40 || val > 180) return showToast("Introduce un peso válido");
         const today = new Date().toISOString().slice(0, 10);
         state.weights.push({ date: today, val, note });
         state.profile.weight = val;
@@ -1767,107 +1967,55 @@ Devuelve JSON estricto:
         showToast("Peso registrado");
       };
 
-      // CONSULTOR IA Y COMIDAS
       document.getElementById("sub-consultor-btn").onclick = () => {
         document.getElementById("sub-consultor-view").classList.remove("hidden");
         document.getElementById("sub-comidas-view").classList.add("hidden");
         document.getElementById("sub-consultor-btn").className = "rounded-xl bg-[#fc4c02] py-2 text-xs font-extrabold text-white shadow-2xs";
         document.getElementById("sub-comidas-btn").className = "rounded-xl bg-transparent py-2 text-xs font-bold text-slate-500 hover:text-slate-800";
       };
-
       document.getElementById("sub-comidas-btn").onclick = () => {
-        document.getElementById("sub-consultor-view").classList.add("hidden");
         document.getElementById("sub-comidas-view").classList.remove("hidden");
+        document.getElementById("sub-consultor-view").classList.add("hidden");
         document.getElementById("sub-comidas-btn").className = "rounded-xl bg-[#fc4c02] py-2 text-xs font-extrabold text-white shadow-2xs";
         document.getElementById("sub-consultor-btn").className = "rounded-xl bg-transparent py-2 text-xs font-bold text-slate-500 hover:text-slate-800";
-        renderMeals();
+        renderConsultor();
       };
 
       document.getElementById("goto-api-key-btn").onclick = () => {
-        switchMainTab("perfil");
+        switchTab("perfil");
         document.getElementById("keys-panel").classList.remove("hidden");
       };
 
       document.querySelectorAll(".quick-q-btn").forEach(btn => {
-        btn.onclick = () => {
-          document.getElementById("chat-input").value = btn.dataset.quickQ;
-          document.getElementById("chat-send-btn").click();
-        };
+        btn.onclick = () => sendChatMessage(btn.getAttribute("data-quick-q"));
       });
-
-      document.getElementById("chat-send-btn").onclick = async () => {
-        const input = document.getElementById("chat-input");
-        const q = input.value.trim();
-        if (!q) return;
-        input.value = "";
-        state.chatHistory.push({ role: "user", text: q });
-        renderChat();
-        const week = state.weeks[state.currentWeekIdx];
-        try {
-          const prompt = `Eres un entrenador personal técnico y directo (cero peloteo, respuestas en viñetas concisas).
-Atleta: 183 cm, ${state.profile.weight} kg, Media Maratón Sub-2h (5:15-5:25/km), zonas VT1 ${state.profile.zones.vt1}, Z2 ${state.profile.zones.z2}, Tempo ${state.profile.zones.tempo}, VT2 ${state.profile.zones.vt2}, cadencia mín ${state.profile.cadenceMin} ppm.
-En rodajes Z2 los primeros 10-15 min son calentamiento progresivo. Ante molestias articulares o fatiga propone ajustes individualizados según sensaciones.
-Semana actual: ${week.label} (${week.phase}).
-Consulta: ${q}`;
-          const ans = await callGemini(prompt, [], false);
-          state.chatHistory.push({ role: "ai", text: ans });
-          persistState();
-          renderChat();
-        } catch (err) {
-          state.chatHistory.push({ role: "ai", text: `Error IA: ${err.message}` });
-          renderChat();
-        }
-      };
+      document.getElementById("chat-send-btn").onclick = () => sendChatMessage();
 
       document.getElementById("meals-prev-week").onclick = () => {
-        if (state.mealsWeekIdx > 0) {
-          state.mealsWeekIdx--;
-          renderMeals();
-        }
+        if (state.mealsWeekIdx > 0) { state.mealsWeekIdx--; renderConsultor(); }
       };
       document.getElementById("meals-next-week").onclick = () => {
-        if (state.mealsWeekIdx < state.weeks.length - 1) {
-          state.mealsWeekIdx++;
-          renderMeals();
-        }
+        if (state.mealsWeekIdx < state.weeks.length - 1) { state.mealsWeekIdx++; renderConsultor(); }
       };
-      document.getElementById("meals-week-select").onchange = e => {
+      document.getElementById("meals-week-select").onchange = (e) => {
         state.mealsWeekIdx = Number(e.target.value);
-        renderMeals();
+        renderConsultor();
       };
+      attachSwipe(
+        document.getElementById("meals-swipe-area"),
+        () => { if (state.mealsWeekIdx < state.weeks.length - 1) { state.mealsWeekIdx++; renderConsultor(); } },
+        () => { if (state.mealsWeekIdx > 0) { state.mealsWeekIdx--; renderConsultor(); } }
+      );
+      document.getElementById("gen-meals-btn").onclick = generateWeeklyMeals;
 
-      document.getElementById("gen-meals-btn").onclick = async () => {
-        const week = state.weeks[state.mealsWeekIdx];
-        const out = document.getElementById("meals-output");
-        out.innerHTML = `<div class="rounded-xl bg-orange-50 p-3 text-xs font-bold text-[#fc4c02]">Generando planificación semanal de comidas...</div>`;
-        try {
-          const activeDays = week.days.map(d => `${d.dayName}: ${d.off ? "OFF" : d.sessions.map(s => `${s.title} (${s.durationMin}')`).join(" + ")}`).join("\n");
-          const prompt = `Genera una recomendación semanal de comidas práctica y escaneable en viñetas para ${week.label} (${week.phase}).
-Atleta: 183 cm, ${state.profile.weight} kg, objetivo pérdida de grasa + rendimiento Media Maratón.
-Entrenamientos de esa semana:\n${activeDays}\n
-Reglas:
-- Ajusta hidratos según carga de cada día (más en calidad y tirada larga, déficit ligero en días OFF).
-- Solo menciona geles/hidratación si hay tirada larga >= 85 min o si es la Semana 15 de carrera (carga de hidratos).
-- Tono directo y sin relleno.`;
-          const ans = await callGemini(prompt, [], false);
-          state.mealsByWeek[state.mealsWeekIdx] = ans;
-          persistState();
-          renderMeals();
-        } catch (err) {
-          out.innerHTML = `<div class="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700">Error IA: ${escapeHtml(err.message)}</div>`;
-        }
-      };
-
-      // PERFIL
       document.getElementById("toggle-new-goal").onclick = () => {
         document.getElementById("new-goal-form").classList.toggle("hidden");
       };
-
       document.getElementById("add-goal-btn").onclick = () => {
         const name = document.getElementById("new-goal-name").value.trim();
         const pace = document.getElementById("new-goal-pace").value.trim() || "5:20";
         const date = document.getElementById("new-goal-date").value || "2027-02-28";
-        if (!name) return showToast("Escribe un nombre para el objetivo");
+        if (!name) return;
         state.goals.forEach(g => g.active = false);
         state.goals.unshift({ id: `g-${Date.now()}`, name, pace, date, active: true });
         document.getElementById("new-goal-name").value = "";
@@ -1875,7 +2023,6 @@ Reglas:
         persistState();
         renderHeader();
         renderPerfil();
-        showToast("Nuevo objetivo activado");
       };
 
       document.getElementById("save-profile-btn").onclick = () => {
@@ -1888,10 +2035,14 @@ Reglas:
         state.profile.zones.vt2 = document.getElementById("z-vt2").value.trim();
         state.profile.zones.vo2 = document.getElementById("z-vo2").value.trim();
         state.profile.notes = document.getElementById("p-notes").value.trim();
-        const kVal = document.getElementById("k-gemini").value.trim();
-        if (kVal) state.profile.geminiKey = kVal;
+        const newKey = document.getElementById("k-gemini").value.trim();
+        if (newKey) {
+          state.profile.geminiKey = newKey;
+          cachedActiveModels = null;
+        }
         persistState();
         renderHeader();
+        renderWeek();
         updateApiKeyPreviewBadge();
         showToast("Ficha guardada");
       };
@@ -1899,7 +2050,6 @@ Reglas:
       document.getElementById("toggle-keys-panel").onclick = () => {
         document.getElementById("keys-panel").classList.toggle("hidden");
       };
-
       document.getElementById("toggle-key-vis-btn").onclick = () => {
         const inp = document.getElementById("k-gemini");
         const btn = document.getElementById("toggle-key-vis-btn");
@@ -1911,49 +2061,34 @@ Reglas:
           btn.textContent = "Ver";
         }
       };
-
       document.getElementById("test-api-key-btn").onclick = async () => {
-        const inp = document.getElementById("k-gemini");
-        const fb = document.getElementById("api-key-feedback");
-        const stBadge = document.getElementById("api-key-status-badge");
-        const newKey = inp.value.trim();
-        if (newKey) {
-          state.profile.geminiKey = newKey;
-          cachedDiscoveredModels = null;
+        const k = document.getElementById("k-gemini").value.trim();
+        if (k) {
+          state.profile.geminiKey = k;
+          cachedActiveModels = null;
           persistState();
           updateApiKeyPreviewBadge();
         }
-        fb.textContent = "Verificando conexión con Gemini...";
+        const stBadge = document.getElementById("api-key-status-badge");
+        const fb = document.getElementById("api-key-feedback");
+        stBadge.textContent = "Probando...";
         try {
-          const reply = await callGemini("Responde únicamente: OK", [], false);
+          const out = await callGemini("Responde exactamente con: OK", [], false);
           stBadge.textContent = "Conectada ✓";
           stBadge.className = "rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800";
-          fb.textContent = `Conexión verificada (${reply.slice(0, 20)}).`;
+          fb.textContent = `Conexión verificada correctamente (${out.trim()}).`;
         } catch (err) {
           stBadge.textContent = "Error";
           stBadge.className = "rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700";
           fb.textContent = err.message;
         }
       };
-
-      attachSwipe("swipe-week-area", () => document.getElementById("next-week").click(), () => document.getElementById("prev-week").click());
-      attachSwipe("meals-swipe-area", () => document.getElementById("meals-next-week").click(), () => document.getElementById("meals-prev-week").click());
     }
 
     function initApp() {
-      try {
-        bindGlobalControls();
-        renderHeader();
-        renderWeek();
-        updateApiKeyPreviewBadge();
-      } catch (err) {
-        localStorage.removeItem(STORAGE_KEY);
-        state = createInitialState();
-        bindGlobalControls();
-        renderHeader();
-        renderWeek();
-        updateApiKeyPreviewBadge();
-      }
+      renderHeader();
+      bindGlobalControls();
+      renderWeek();
     }
 
     if (document.readyState === "loading") {
