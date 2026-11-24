@@ -1928,7 +1928,7 @@ No recomiendes suplementos innecesarios. Formato limpio y escaneable.`;
       };
 
       attachSwipe(
-        document.getElementById("swipe-week-area"),
+        document.getElementById("tab-semana"),
         () => { if (state.currentWeekIdx < state.weeks.length - 1) { state.currentWeekIdx++; renderWeek(); } },
         () => { if (state.currentWeekIdx > 0) { state.currentWeekIdx--; renderWeek(); } }
       );
