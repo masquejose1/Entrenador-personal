@@ -1571,14 +1571,15 @@ Devuelve EXCLUSIVAMENTE un array JSON válido sin markdown con este formato:
 
       const prompt = `Analiza estas ${imgs.length} capturas de Garmin para la sesión "${s.title}" (${s.structure || s.target_hr || s.target_pace || ""}).
 Perfil: 183 cm, ${state.profile.weight} kg, Zonas: VT1 ${z.vt1}, Z2 ${z.z2}, Tempo ${z.tempo}, VT2 ${z.vt2}, VO2MAX ${z.vo2}. Cadencia mínima ${state.profile.cadence} ppm.
-Reglas:
+Reglas obligatorias de fisiología y evaluación:
 1. Combina los datos de todas las capturas (resumen general y pantallas de parciales/vueltas sin duplicar tramos solapados).
-2. Cero peloteo: diagnóstico directo, realista y resumido (máx 2 frases en "summary").
-3. Si el pulso se sale de la zona planificada o la cadencia < ${state.profile.cadence}, dilo claramente.
-4. ${isQuality
+2. CALENTAMIENTO PROGRESIVO (PRIMEROS 10-15 MINUTOS): En rodajes aeróbicos y tiradas largas en Zona 2 (${z.z2} ppm), es completamente normal y correcto que durante los primeros 10-15 minutos (km 1 y km 2) el pulso suba gradualmente desde reposo/VT1 hasta entrar en Zona 2 sin hacer sprints iniciales, y que el ritmo sea algo más suave en ese calentamiento. NO penalices ni digas que va "lento" o "por debajo de zona" por los primeros 10-15 minutos de activación; evalúa el cumplimiento real de Zona 2 y ritmo a partir del minuto 12-15 (km 3 en adelante) o en los bloques centrales.
+3. Cero peloteo: diagnóstico directo, realista y resumido (máx 2 frases en "summary").
+4. Si a partir del minuto 15 el pulso se excede de la zona planificada o la cadencia media es < ${state.profile.cadence} ppm, señálalo claramente.
+5. ${isQuality
   ? 'Como es sesión de SERIES/CALIDAD, extrae en "splits" cada serie o intervalo realizado con splitMode="series" (ej. label: "Serie 1", durationOrDist: "4:00 · 0,78 km", pace: "5:07/km", hr: 166).'
-  : 'Como es RODAJE o TIRADA LARGA, extrae en "splits" cada kilómetro parcial visible con splitMode="km" (ej. label: "Km 1", durationOrDist: "1,00 km", pace: "5:38/km", hr: 150).'}
-5. Recalcula también las series concretas de la próxima sesión de calidad y el ritmo estimado 21.1 km en segundos/km (paceSec21k).
+  : 'Como es RODAJE o TIRADA LARGA, extrae en "splits" cada kilómetro parcial visible con splitMode="km" (ej. label: "Km 1", durationOrDist: "1,00 km", pace: "5:38/km", hr": 150).'}
+6. Recalcula también las series concretas de la próxima sesión de calidad y el ritmo estimado 21.1 km en segundos/km (paceSec21k), basándote en el tramo estabilizado posterior al calentamiento (no arrastrado a la baja por los primeros 10-15 min).
 Devuelve SOLO un objeto JSON válido con estas claves exactas:
 {"distance":"8,20 km","time":"44:10","avgPace":"5:23","avgHr":154,"avgCadence":166,"summary":"Resumen directo en 2 líneas","best":"...","improve":"...","splitMode":"${isQuality ? "series" : "km"}","splits":[{"label":"Km 1","durationOrDist":"1,00 km","pace":"5:38/km","hr":149}],"paceSec21k":328,"nextQualityTitle":"...","nextQualityStructure":"..."}`;
 
@@ -1989,7 +1990,7 @@ Devuelve SOLO JSON válido sin markdown con este formato:
 
       const prompt = `Actúa como entrenador personal de running y fuerza para Jose (183 cm, ${state.profile.weight} kg, Media Maratón Sub-2h objetivo 5:15-5:25/km, zonas VT1 ${z.vt1}, Z2 ${z.z2}, Tempo ${z.tempo}, VT2 ${z.vt2}, VO2MAX ${z.vo2}, cadencia mín ${state.profile.cadence} ppm).
 Semana actual (${w.week} - ${w.phase}): ${JSON.stringify(w.sessions.map(s => ({ day: s.day, title: s.title, min: s.duration_min, done: s.completed })))}.
-Reglas obligatorias: Cero peloteo, directo y realista. Formato lista de viñetas escaneables. Si el atleta reporta molestias articulares, sobrecarga o fatiga, diseña una adaptación individualizada de sus sesiones según sus sensaciones concretas (ajustando intensidad, zonas VT1/Z2, cadencia o fuerza protectora) en lugar de aplicar recortes genéricos. No recomiendes suplementos sin contexto.
+Reglas obligatorias: Cero peloteo, directo y realista. Formato lista de viñetas escaneables. Ten en cuenta que en rodajes Z2 los primeros 10-15 minutos son de calentamiento progresivo (es normal que el pulso suba poco a poco sin esprintar). Si el atleta reporta molestias articulares, sobrecarga o fatiga, diseña una adaptación individualizada de sus sesiones según sus sensaciones concretas (ajustando intensidad, zonas VT1/Z2, cadencia o fuerza protectora) en lugar de aplicar recortes genéricos. No recomiendes suplementos sin contexto.
 Consulta: "${q}"`;
 
       const ans = await callGemini(prompt);
