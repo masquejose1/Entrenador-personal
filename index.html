@@ -1390,17 +1390,18 @@
     async function discoverActiveGeminiModels(apiKey) {
       if (cachedActiveModels) return cachedActiveModels;
       const defaults = [
-        "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
-        "gemini-2.0-flash"
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest"
       ];
       try {
         const res = await fetchWithTimeout(
           `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
           {},
-          6000
+          5000
         );
         if (!res.ok) return defaults;
         const data = await res.json();
@@ -1408,7 +1409,7 @@
           .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
           .map(m => m.name.replace("models/", ""))
           .filter(name => name.includes("gemini") && !name.includes("embedding") && !name.includes("vision") && !name.includes("pro"));
-        const combined = [...new Set([...defaults, ...available])].slice(0, 5);
+        const combined = [...new Set([...defaults, ...available])].slice(0, 7);
         cachedActiveModels = combined;
         return combined;
       } catch {
@@ -1436,7 +1437,7 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(basePayload)
-          }, 10000);
+          }, 7000);
           const data = await res.json();
           if (!res.ok) {
             const msg = `${model}: ${data?.error?.message || res.status}`;
@@ -1446,7 +1447,7 @@
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ contents: [{ parts }] })
-              }, 10000);
+              }, 7000);
               const retryData = await retryRes.json();
               if (retryRes.ok && retryData?.candidates?.[0]?.content?.parts?.[0]?.text) {
                 return retryData.candidates[0].content.parts[0].text;
@@ -1457,10 +1458,10 @@
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) return text;
         } catch (e) {
-          errors.push(e.name === "AbortError" ? `${model}: Tiempo agotado (10s)` : `${model}: ${e.message || String(e)}`);
+          errors.push(e.name === "AbortError" ? `${model}: Tiempo agotado (7s)` : `${model}: ${e.message || String(e)}`);
         }
       }
-      throw new Error(errors[0] || "No se pudo conectar con Gemini.");
+      throw new Error(errors[errors.length - 1] || errors[0] || "No se pudo conectar con Gemini.");
     }
 
     function parseJsonSafe(rawText) {
