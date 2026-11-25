@@ -30,10 +30,10 @@
 <body class="bg-[#f7f7fa] text-slate-900">
 
   <!-- CABECERA ESTILO STRAVA -->
-  <header class="safe-top-header sticky top-0 z-30 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-xs">
+  <header class="safe-top-header sticky top-0 z-30 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-sm">
     <div class="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
       <div class="flex items-center gap-2.5 min-w-0">
-        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fc4c02] text-white shadow-xs">
+        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fc4c02] text-white shadow-sm">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
           </svg>
@@ -326,7 +326,7 @@
 
   <!-- VISTA DETALLE ACTIVIDAD DE CARRERA (ESTILO STRAVA) -->
   <div id="run-detail-modal" class="fixed inset-0 z-50 hidden flex-col bg-[#f7f7fa] overflow-y-auto">
-    <div class="sticky top-0 z-10 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-xs">
+    <div class="sticky top-0 z-10 border-b border-[#e2e8f0] bg-white/95 backdrop-blur-sm">
       <div class="mx-auto flex max-w-xl items-center justify-between px-4 py-3">
         <button id="close-run-detail" class="inline-flex items-center gap-1.5 rounded-xl border border-[#e2e8f0] bg-[#f7f7fa] px-3 py-1.5 text-xs font-extrabold text-slate-800 hover:bg-slate-200/70">
           ← Volver
@@ -437,7 +437,7 @@
   <div id="toast-box" class="fixed bottom-20 left-1/2 z-50 hidden -translate-x-1/2 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-lg"></div>
 
   <!-- BARRA INFERIOR DE NAVEGACIÓN (4 ICONOS SVG ORIGINALES) -->
-  <nav class="safe-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-[#e2e8f0] bg-white/95 backdrop-blur-xs">
+  <nav class="safe-bottom-nav fixed inset-x-0 bottom-0 z-40 border-t border-[#e2e8f0] bg-white/95 backdrop-blur-sm">
     <div class="mx-auto grid max-w-xl grid-cols-4">
       <button id="nav-semana" aria-label="Semana" class="flex items-center justify-center border-t-2 border-[#fc4c02] pt-3 pb-1 text-[#fc4c02]">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -2310,11 +2310,26 @@ Devuelve JSON estricto sin markdown:
       }, { passive: true });
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      renderHeaderAndProfile();
-      renderWeek();
-      bindAllEvents();
-    });
+    function initApp() {
+      try {
+        renderHeaderAndProfile();
+        renderWeek();
+        bindAllEvents();
+      } catch (err) {
+        console.error("Error iniciando app, restableciendo estado base:", err);
+        state = createInitialState();
+        persistState();
+        renderHeaderAndProfile();
+        renderWeek();
+        bindAllEvents();
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initApp);
+    } else {
+      initApp();
+    }
   </script>
 </body>
 </html>
