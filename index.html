@@ -622,6 +622,8 @@
         try {
           const endpoint = `https://generativelanguage.googleapis.com/${entry.apiVer}/models/${encodeURIComponent(entry.name)}:generateContent`;
           const auth = buildGeminiRequestAuth(endpoint, apiKey);
+          const hasImages = Array.isArray(options.inlineParts) && options.inlineParts.length > 0;
+          const timeoutMs = options.timeoutMs || (hasImages ? 18000 : 4500);
           const res = await fetchWithTimeout(
             auth.url,
             {
@@ -629,7 +631,7 @@
               headers: auth.headers,
               body: JSON.stringify(bodyPayload)
             },
-            4500
+            timeoutMs
           );
 
           const rawText = await res.text();
@@ -686,7 +688,7 @@
           const img = new Image();
           img.onload = () => {
             try {
-              const maxDim = 1200;
+              const maxDim = 960;
               let w = img.width;
               let h = img.height;
               if (w > maxDim || h > maxDim) {
@@ -703,7 +705,7 @@
               canvas.height = h;
               const ctx = canvas.getContext("2d");
               ctx.drawImage(img, 0, 0, w, h);
-              const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+              const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
               const base64 = dataUrl.split(",")[1];
               resolve({
                 inlineData: {
@@ -2060,19 +2062,24 @@ Devuelve JSON estricto con:
         const files = Array.from(e.target.files || []);
         if (!files.length || !activeRunSessionRef) return;
         const loadingEl = document.getElementById("rd-loading");
-        loadingEl?.classList.remove("hidden");
+        if (loadingEl) {
+          loadingEl.className = "rounded-xl bg-orange-50 p-3 text-xs font-bold text-[#fc4c02]";
+          loadingEl.textContent = `Optimizando y analizando ${files.length} captura(s) con Gemini IA (puede tardar 8-15 s)...`;
+          loadingEl.classList.remove("hidden");
+        }
         try {
           const inlineParts = await Promise.all(files.map(fileToInlinePart));
           const { session, sessionIdx, weekIndex } = activeRunSessionRef;
-          const prompt = `Audita estas capturas de Garmin de una sesión de carrera (${session.title}, objetivo FC: ${session.target_hr || "148-155"} ppm, ritmo objetivo: ${session.target_pace || "5:20"} min/km, cadencia objetivo >= 165 ppm).
+          const prompt = `Audita estas ${files.length} capturas de Garmin de una sesión de carrera (${session.title}, objetivo FC: ${session.target_hr || "148-155"} ppm, ritmo objetivo: ${session.target_pace || "5:20"} min/km, cadencia objetivo >= 165 ppm).
 Reglas obligatorias:
+- Combina toda la información de las ${files.length} capturas (resumen general, ritmo/pulso/cadencia y tabla de parciales/laps).
 - En rodajes y tiradas largas Z2, los primeros 10-15 minutos corresponden a calentamiento/activación fisiológica y deriva inicial: NO penalices ni taches de lento ese tramo inicial.
 - Evalúa la zona cardíaca y la cadencia (>= 165 ppm para descargar rótula).
 - Propón nextQualityPrescription concreta para la próxima sesión de calidad.
 Devuelve JSON estricto sin markdown:
 {"distance":"string","duration":"string","pace":"string","avgHr":"number","cadence":"string","summary":"string","bullets":["string"],"nextQualityPrescription":"string","splits":[{"label":"string","timeOrDist":"string","pace":"string","hr":"string"}]}`;
 
-          const raw = await callGemini(prompt, { inlineParts, jsonMode: true, temperature: 0.25 });
+          const raw = await callGemini(prompt, { inlineParts, jsonMode: true, temperature: 0.25, timeoutMs: 20000 });
           const clean = raw.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
           const audit = JSON.parse(clean);
           session.audit = audit;
@@ -2082,11 +2089,16 @@ Devuelve JSON estricto sin markdown:
           persistState();
           renderWeek();
           renderRunAuditDetails(audit);
-          showToast("Captura auditada y series recalculadas");
+          if (loadingEl) loadingEl.classList.add("hidden");
+          showToast("Capturas auditadas y series recalculadas");
         } catch (err) {
+          if (loadingEl) {
+            loadingEl.className = "rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700";
+            loadingEl.textContent = `Error al analizar capturas: ${err.message}`;
+            loadingEl.classList.remove("hidden");
+          }
           showToast(`Error en auditoría: ${err.message}`);
         } finally {
-          loadingEl?.classList.add("hidden");
           e.target.value = "";
         }
       });
