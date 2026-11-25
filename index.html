@@ -472,43 +472,37 @@
     const STORAGE_KEY = "entrenador_c21_local_v1";
     const ALL_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
     const LEG_EXERCISES_DEFAULT = [
-      { name: "Wall Sit / Prensa isométrica 60°", sets: "3", reps: "45-60s", weight: "0", done: false },
-      { name: "Sentadilla Goblet / Prensa inclinada", sets: "3", reps: "10-12", weight: "24", done: false },
-      { name: "Peso Muerto Rumano (mancuernas/barra)", sets: "3", reps: "10-12", weight: "30", done: false },
-      { name: "Step-Up alto / Zancada atrás", sets: "3", reps: "10/pierna", weight: "16", done: false },
-      { name: "Elevación de talones de pie (sóleo/gemelo)", sets: "3", reps: "15", weight: "20", done: false },
-      { name: "Plancha lateral + Monster Walks (glúteo medio)", sets: "3", reps: "12/lado", weight: "Banda", done: false }
+      { name: "Wall Sit / Prensa isométrica 60°", sets: "3", reps: "40s", weight: "0", done: false },
+      { name: "Sentadilla Goblet / Prensa inclinada", sets: "3", reps: "10", weight: "20", done: false },
+      { name: "Peso Muerto Rumano", sets: "3", reps: "10", weight: "30", done: false },
+      { name: "Step-Up alto / Zancada atrás", sets: "3", reps: "10", weight: "10", done: false },
+      { name: "Elevación de talones (sóleo/gemelo)", sets: "3", reps: "15", weight: "20", done: false },
+      { name: "Plancha lateral / Monster Walks", sets: "3", reps: "12", weight: "0", done: false }
     ];
-
+    const expandedGymSessions = {};
     let activeRunSessionRef = null;
-    let expandedGymSessions = {};
 
-    // Muestra un mensaje flotante temporal sin usar alert()
+    // Muestra un mensaje breve flotante
     function showToast(msg) {
       const box = document.getElementById("toast-box");
       if (!box) return;
       box.textContent = msg;
       box.classList.remove("hidden");
-      clearTimeout(showToast._timer);
-      showToast._timer = setTimeout(() => {
-        box.classList.add("hidden");
-      }, 2800);
+      clearTimeout(box._timer);
+      box._timer = setTimeout(() => box.classList.add("hidden"), 2800);
     }
 
-    // Resuelve la clave activa de Gemini
+    // Resuelve la clave activa de Gemini desde el campo, el estado o el valor por defecto
     function resolveGeminiApiKey() {
-      const inputEl = document.getElementById("k-gemini");
-      if (inputEl && typeof inputEl.value === "string" && inputEl.value.trim()) {
-        return inputEl.value.trim();
-      }
-      if (state && state.profile && typeof state.profile.geminiKey === "string" && state.profile.geminiKey.trim()) {
-        return state.profile.geminiKey.trim();
-      }
-      return DEFAULT_API_KEY;
+      const inputVal = document.getElementById("k-gemini")?.value?.trim();
+      if (inputVal) return inputVal;
+      const stateVal = typeof state !== "undefined" ? String(state?.profile?.geminiKey || "").trim() : "";
+      if (stateVal) return stateVal;
+      return String(DEFAULT_API_KEY || "").trim();
     }
 
     // Fetch con límite de tiempo estricto mediante AbortController
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 4500) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -518,73 +512,124 @@
       }
     }
 
-    // Descubre modelos disponibles sin quedarnos en bucles largos
-    async function discoverActiveGeminiModels(apiKey) {
-      const fallbackModels = [
-        "gemini-2.5-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-        "gemini-2.0-flash-lite",
-        "gemini-2.0-flash"
-      ];
-      try {
-        const res = await fetchWithTimeout(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
-          { method: "GET" },
-          5500
-        );
-        if (!res.ok) return fallbackModels;
-        const data = await res.json();
-        const available = (data.models || [])
-          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
-          .map(m => String(m.name || "").replace(/^models\//, ""))
-          .filter(name => name && !name.toLowerCase().includes("pro") && !name.toLowerCase().includes("embedding") && !name.toLowerCase().includes("imagen"));
-
-        const ordered = [];
-        [...fallbackModels, ...available].forEach(m => {
-          if (m && !ordered.includes(m)) ordered.push(m);
-        });
-        return ordered.slice(0, 5);
-      } catch (_) {
-        return fallbackModels;
-      }
+    // Construye las cabeceras y URL adecuadas para claves AQ. o AIza...
+    function buildGeminiRequestAuth(baseUrl, apiKey) {
+      const cleanKey = String(apiKey || "").trim();
+      const sep = baseUrl.includes("?") ? "&" : "?";
+      const url = `${baseUrl}${sep}key=${encodeURIComponent(cleanKey)}`;
+      const headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": cleanKey
+      };
+      return { url, headers };
     }
 
-    // Llama a Gemini con salto automático ante saturación y soporte de imágenes inline
+    // Descubre dinámicamente todos los modelos activos (no obsoletos) ordenados de mejor a más rápido
+    async function discoverActiveGeminiModels(apiKey) {
+      const priorityOrder = [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite"
+      ];
+
+      const discovered = [];
+      for (const apiVer of ["v1beta", "v1"]) {
+        try {
+          const auth = buildGeminiRequestAuth(`https://generativelanguage.googleapis.com/${apiVer}/models`, apiKey);
+          const res = await fetchWithTimeout(auth.url, { method: "GET", headers: auth.headers }, 3500);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const valid = (data.models || [])
+            .filter(m => {
+              const methods = Array.isArray(m.supportedGenerationMethods) ? m.supportedGenerationMethods : [];
+              const desc = String(m.description || "").toLowerCase();
+              const rawName = String(m.name || "").replace(/^models\//, "");
+              const lower = rawName.toLowerCase();
+              if (!methods.includes("generateContent")) return false;
+              if (!lower.startsWith("gemini-")) return false;
+              if (desc.includes("deprecated") || desc.includes("discontinued") || desc.includes("legacy")) return false;
+              if (lower.includes("embedding") || lower.includes("imagen") || lower.includes("veo") || lower.includes("aqa") || lower.includes("tts") || lower.includes("robotics")) return false;
+              return true;
+            })
+            .map(m => ({
+              apiVer,
+              name: String(m.name || "").replace(/^models\//, "")
+            }));
+
+          valid.forEach(item => {
+            if (!discovered.some(d => d.name === item.name)) {
+              discovered.push(item);
+            }
+          });
+          if (discovered.length) break;
+        } catch (_) {
+          // Si falla el listado en esta versión, continúa con respaldo
+        }
+      }
+
+      const queue = [];
+      priorityOrder.forEach(pName => {
+        const match = discovered.find(d => d.name === pName);
+        if (match) {
+          queue.push(match);
+        } else {
+          queue.push({ apiVer: "v1beta", name: pName });
+        }
+      });
+
+      discovered.forEach(d => {
+        if (!queue.some(q => q.name === d.name)) {
+          queue.push(d);
+        }
+      });
+
+      return queue;
+    }
+
+    // Llama a Gemini recorriendo todos los modelos disponibles con límite estricto de 4.5s por modelo
     async function callGemini(prompt, options = {}) {
       const apiKey = resolveGeminiApiKey();
       if (!apiKey) {
         throw new Error("Configura tu clave de Gemini en Perfil → Clave de API IA.");
       }
 
-      const models = await discoverActiveGeminiModels(apiKey);
+      const modelQueue = await discoverActiveGeminiModels(apiKey);
       const parts = [];
       if (Array.isArray(options.inlineParts)) {
         options.inlineParts.forEach(p => parts.push(p));
       }
       parts.push({ text: prompt });
 
-      const bodyPayload = {
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          temperature: options.temperature ?? 0.35,
-          ...(options.jsonMode ? { responseMimeType: "application/json" } : {})
-        }
-      };
-
       let firstDetailedError = "";
+      const triedModels = new Set();
 
-      for (const modelName of models) {
+      for (const entry of modelQueue) {
+        if (triedModels.has(entry.name)) continue;
+        triedModels.add(entry.name);
+
+        const bodyPayload = {
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            temperature: options.temperature ?? 0.35,
+            ...(options.jsonMode ? { responseMimeType: "application/json" } : {})
+          }
+        };
+
         try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          const endpoint = `https://generativelanguage.googleapis.com/${entry.apiVer}/models/${encodeURIComponent(entry.name)}:generateContent`;
+          const auth = buildGeminiRequestAuth(endpoint, apiKey);
           const res = await fetchWithTimeout(
-            url,
+            auth.url,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: auth.headers,
               body: JSON.stringify(bodyPayload)
             },
-            8000
+            4500
           );
 
           const rawText = await res.text();
@@ -597,25 +642,25 @@
 
           if (!res.ok) {
             const msg = data?.error?.message || rawText.slice(0, 140) || `HTTP ${res.status}`;
-            if (!firstDetailedError) firstDetailedError = `${modelName}: ${msg}`;
+            if (!firstDetailedError) firstDetailedError = `${entry.name}: ${msg}`;
             continue;
           }
 
           const outText = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
           if (!outText) {
-            if (!firstDetailedError) firstDetailedError = `${modelName}: respuesta vacía`;
+            if (!firstDetailedError) firstDetailedError = `${entry.name}: respuesta vacía`;
             continue;
           }
 
-          setApiKeyBadge("Conectada ✓", "text-emerald-700 bg-emerald-50 border border-emerald-200", `Conectado vía ${modelName}`);
+          setApiKeyBadge("Conectada ✓", "text-emerald-700 bg-emerald-50 border border-emerald-200", `Conectado vía ${entry.name}`);
           return outText;
         } catch (err) {
-          const errMsg = err?.name === "AbortError" ? "tiempo de espera agotado (8s)" : (err?.message || "error de red");
-          if (!firstDetailedError) firstDetailedError = `${modelName}: ${errMsg}`;
+          const errMsg = err?.name === "AbortError" ? "tiempo límite (4.5s) alcanzado" : (err?.message || "error de red");
+          if (!firstDetailedError) firstDetailedError = `${entry.name}: ${errMsg}`;
         }
       }
 
-      const finalMsg = firstDetailedError || "No se pudo conectar con ningún modelo de Gemini.";
+      const finalMsg = firstDetailedError || "No se pudo conectar con ningún modelo activo de Gemini.";
       setApiKeyBadge("Error IA", "text-rose-700 bg-rose-50 border border-rose-200", finalMsg);
       throw new Error(finalMsg);
     }
