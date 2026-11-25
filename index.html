@@ -347,17 +347,17 @@
         <p id="rd-structure" class="text-xs font-medium text-slate-600"></p>
         <div id="rd-targets" class="flex flex-wrap gap-1.5 pt-0.5"></div>
       </div>
-
+      <!-- SUBIDA DE CAPTURAS GARMIN -->
       <div class="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-2xs space-y-2.5">
         <div class="flex items-center justify-between gap-2">
           <div>
             <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500">Análisis con capturas Garmin</h3>
             <p class="text-[11px] text-slate-400">Sube resumen y parciales/laps para extraer métricas y splits</p>
           </div>
-          <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#fc4c02] px-3.5 py-2 text-xs font-extrabold text-white shadow-2xs hover:bg-[#e04300]">
+          <label for="rd-photo-input" class="relative inline-flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-xl bg-[#fc4c02] px-3.5 py-2 text-xs font-extrabold text-white shadow-2xs hover:bg-[#e04300]">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             <span>Subir capturas</span>
-            <input type="file" accept="image/*" multiple class="hidden" id="rd-photo-input" />
+            <input type="file" accept="image/*" multiple class="absolute inset-0 h-full w-full cursor-pointer opacity-0" id="rd-photo-input" />
           </label>
         </div>
         <div id="rd-loading" class="hidden rounded-xl bg-orange-50 p-3 text-xs font-bold text-[#fc4c02]">
@@ -597,9 +597,18 @@
         throw new Error("Configura tu clave de Gemini en Perfil → Clave de API IA.");
       }
 
-      const modelQueue = await discoverActiveGeminiModels(apiKey);
+      const hasImages = Array.isArray(options.inlineParts) && options.inlineParts.length > 0;
+      let modelQueue = await discoverActiveGeminiModels(apiKey);
+      if (hasImages) {
+        const fastVisionOrder = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-2.0-flash", "gemini-2.5-pro"];
+        modelQueue = [
+          ...fastVisionOrder
+            .map(name => modelQueue.find(m => m.name === name) || { apiVer: "v1beta", name }),
+          ...modelQueue.filter(m => !fastVisionOrder.includes(m.name))
+        ];
+      }
       const parts = [];
-      if (Array.isArray(options.inlineParts)) {
+      if (hasImages) {
         options.inlineParts.forEach(p => parts.push(p));
       }
       parts.push({ text: prompt });
@@ -622,8 +631,7 @@
         try {
           const endpoint = `https://generativelanguage.googleapis.com/${entry.apiVer}/models/${encodeURIComponent(entry.name)}:generateContent`;
           const auth = buildGeminiRequestAuth(endpoint, apiKey);
-          const hasImages = Array.isArray(options.inlineParts) && options.inlineParts.length > 0;
-          const timeoutMs = options.timeoutMs || (hasImages ? 18000 : 4500);
+          const timeoutMs = options.timeoutMs || (hasImages ? 14000 : 4500);
           const res = await fetchWithTimeout(
             auth.url,
             {
@@ -679,49 +687,49 @@
         fb.textContent = feedbackText;
       }
     }
-
-    // Comprime/redimensiona una imagen a máximo 1200px JPEG (0.82) para subirla ligera
+    // Comprime/redimensiona una imagen usando ObjectURL para no saturar la memoria en iOS Safari
     function fileToInlinePart(file) {
       return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const img = new Image();
-          img.onload = () => {
-            try {
-              const maxDim = 960;
-              let w = img.width;
-              let h = img.height;
-              if (w > maxDim || h > maxDim) {
-                if (w >= h) {
-                  h = Math.round((h * maxDim) / w);
-                  w = maxDim;
-                } else {
-                  w = Math.round((w * maxDim) / h);
-                  h = maxDim;
-                }
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDim = 900;
+            let w = img.naturalWidth || img.width;
+            let h = img.naturalHeight || img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w >= h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
               }
-              const canvas = document.createElement("canvas");
-              canvas.width = w;
-              canvas.height = h;
-              const ctx = canvas.getContext("2d");
-              ctx.drawImage(img, 0, 0, w, h);
-              const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
-              const base64 = dataUrl.split(",")[1];
-              resolve({
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: base64
-                }
-              });
-            } catch (err) {
-              reject(err);
             }
-          };
-          img.onerror = reject;
-          img.src = reader.result;
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+            URL.revokeObjectURL(objectUrl);
+            const base64 = dataUrl.split(",")[1];
+            resolve({
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64
+              }
+            });
+          } catch (err) {
+            URL.revokeObjectURL(objectUrl);
+            reject(err);
+          }
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+        img.onerror = (err) => {
+          URL.revokeObjectURL(objectUrl);
+          reject(err || new Error("No se pudo decodificar la imagen"));
+        };
+        img.src = objectUrl;
       });
     }
 
@@ -2058,17 +2066,32 @@ Devuelve JSON estricto con:
       });
 
       // Subida y auditoría de capturas Garmin en detalle de carrera
-      document.getElementById("rd-photo-input")?.addEventListener("change", async (e) => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length || !activeRunSessionRef) return;
+      const handleRunPhotosSelected = async (e) => {
+        const inputEl = e.target;
+        const files = Array.from(inputEl?.files || []);
+        if (!files.length) return;
+        if (!activeRunSessionRef) {
+          showToast("Abre primero una sesión de carrera");
+          return;
+        }
         const loadingEl = document.getElementById("rd-loading");
         if (loadingEl) {
           loadingEl.className = "rounded-xl bg-orange-50 p-3 text-xs font-bold text-[#fc4c02]";
-          loadingEl.textContent = `Optimizando y analizando ${files.length} captura(s) con Gemini IA (puede tardar 8-15 s)...`;
+          loadingEl.textContent = `Preparando ${files.length} captura(s)...`;
           loadingEl.classList.remove("hidden");
         }
         try {
-          const inlineParts = await Promise.all(files.map(fileToInlinePart));
+          const inlineParts = [];
+          for (let i = 0; i < files.length; i++) {
+            if (loadingEl) {
+              loadingEl.textContent = `Optimizando captura ${i + 1} de ${files.length}...`;
+            }
+            const part = await fileToInlinePart(files[i]);
+            inlineParts.push(part);
+          }
+          if (loadingEl) {
+            loadingEl.textContent = `Analizando ${files.length} captura(s) con Gemini IA...`;
+          }
           const { session, sessionIdx, weekIndex } = activeRunSessionRef;
           const prompt = `Audita estas ${files.length} capturas de Garmin de una sesión de carrera (${session.title}, objetivo FC: ${session.target_hr || "148-155"} ppm, ritmo objetivo: ${session.target_pace || "5:20"} min/km, cadencia objetivo >= 165 ppm).
 Reglas obligatorias:
@@ -2079,7 +2102,7 @@ Reglas obligatorias:
 Devuelve JSON estricto sin markdown:
 {"distance":"string","duration":"string","pace":"string","avgHr":"number","cadence":"string","summary":"string","bullets":["string"],"nextQualityPrescription":"string","splits":[{"label":"string","timeOrDist":"string","pace":"string","hr":"string"}]}`;
 
-          const raw = await callGemini(prompt, { inlineParts, jsonMode: true, temperature: 0.25, timeoutMs: 20000 });
+          const raw = await callGemini(prompt, { inlineParts, jsonMode: true, temperature: 0.25, timeoutMs: 14000 });
           const clean = raw.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
           const audit = JSON.parse(clean);
           session.audit = audit;
@@ -2099,25 +2122,25 @@ Devuelve JSON estricto sin markdown:
           }
           showToast(`Error en auditoría: ${err.message}`);
         } finally {
-          e.target.value = "";
+          if (inputEl) inputEl.value = "";
         }
-      });
+      };
+      document.getElementById("rd-photo-input")?.addEventListener("change", handleRunPhotosSelected);
 
+      // Botón cerrar modal detalle de carrera
       document.getElementById("close-run-detail")?.addEventListener("click", () => {
         const modal = document.getElementById("run-detail-modal");
-        if (modal) {
-          modal.classList.add("hidden");
-          modal.classList.remove("flex");
-        }
+        modal?.classList.add("hidden");
+        modal?.classList.remove("flex");
       });
 
-      // Progreso: añadir peso y alternar gráfica de ritmo
+      // Registro de peso en Progreso
       document.getElementById("add-weight-btn")?.addEventListener("click", () => {
         const valInput = document.getElementById("new-weight-val");
         const noteInput = document.getElementById("new-weight-note");
         const kg = parseFloat(String(valInput?.value || "").replace(",", "."));
-        if (!kg || kg < 40 || kg > 160) {
-          showToast("Introduce un peso válido (kg)");
+        if (!kg || kg < 35 || kg > 200) {
+          showToast("Introduce un peso válido en kg");
           return;
         }
         const today = new Date().toISOString().slice(0, 10);
